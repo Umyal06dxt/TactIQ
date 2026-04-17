@@ -2,11 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship a working demo of LEVERAGE — a vendor-negotiation intelligence agent with a MemoryToggle hero moment and live score diffs — powered by Hindsight Cloud (memory) and CascadeFlow (orchestration), in a 10-hour hackathon sprint.
+**Goal:** Ship a working demo of LEVERAGE — a vendor-negotiation intelligence agent with a MemoryToggle hero moment and live score diffs — powered by Hindsight Cloud (memory) and the OpenAI Agents SDK (orchestration), in a 10-hour hackathon sprint.
 
-**Architecture:** Next.js 15 App Router (TypeScript) calls a FastAPI backend. Backend wraps every briefing and ingest in a CascadeFlow orchestration that emits step timings (`pipeline_trail`). OpenAI gpt-4o synthesizes tactics from Hindsight Opinions for the memory-ON path and generic advice for the memory-OFF path. Frontend renders a MemoryToggle that flips between the two endpoints and a ScoreDiff that animates confidence changes after each post-call log.
+**Architecture:** Next.js 15 App Router (TypeScript) calls a FastAPI backend. Backend defines a `BriefingAgent` via the OpenAI Agents SDK with three function tools (`recall_memories`, `synthesize_briefing`, `rank_tactics`); `Runner.run()` executes the pipeline and a `RunHooks` subclass captures per-tool lifecycle timings into `pipeline_trail`. The agent's LLM step (gpt-4o) synthesizes tactics from Hindsight Opinions. The memory-OFF path bypasses the agent entirely and hits OpenAI directly with a constrained prompt. Frontend renders a MemoryToggle that flips between the two endpoints and a ScoreDiff that animates confidence changes after each post-call log.
 
-**Tech Stack:** Next.js 15 + TypeScript + Tailwind v3.4, FastAPI + Python 3.11, OpenAI (`gpt-4o`), Hindsight Cloud (`hindsight-client`), CascadeFlow (`cascadeflow` SDK), Faker, Vercel (frontend), Railway (backend).
+**Tech Stack:** Next.js 15 + TypeScript + Tailwind v3.4, FastAPI + Python 3.11, OpenAI (`gpt-4o`), OpenAI Agents SDK (`openai-agents`), Hindsight Cloud (`hindsight-client`), Faker, Vercel (frontend), Railway (backend).
+
+**Why OpenAI Agents SDK:** CascadeFlow (the original sponsor for orchestration) is waitlist-gated. The Agents SDK is a clean drop-in — real named SDK, first-party from OpenAI, and its `RunHooks` lifecycle (`on_tool_start` / `on_tool_end`) gives us millisecond-accurate step timings for the UI trail without a hand-rolled timer. Bonus: built-in tracing we could surface later.
 
 **Source of truth:** `spec.md` at repo root.
 
@@ -28,10 +30,10 @@ Everything else verifies via curl, browser smoke-test, and the acceptance checkl
 | File | Responsibility |
 |------|----------------|
 | `main.py` | FastAPI app, CORS config, route wiring, `/health` |
-| `prompts.py` | `BRIEFING_PROMPT` + `NOMEMORY_PROMPT` string constants |
+| `prompts.py` | `BRIEFING_PROMPT` + `NOMEMORY_PROMPT` + `AGENT_INSTRUCTIONS` string constants |
 | `models.py` | Pydantic request/response schemas |
-| `cascade.py` | CascadeFlow orchestration wrapper + step-timing utility |
-| `briefing.py` | `reflect()` → OpenAI → tactics JSON; confidence formula |
+| `pipeline.py` | OpenAI Agents SDK: `BriefingAgent`, function tools (`recall_memories`, `synthesize_briefing`, `rank_tactics`), `PipelineHooks(RunHooks)`, and async `run_briefing()` entry point |
+| `briefing.py` | Confidence formula + `_days_remaining` helper + thin async `build_briefing()` adapter wrapping `pipeline.run_briefing` |
 | `nomemory.py` | OpenAI-only generic-advice endpoint handler |
 | `ingest.py` | §5.4 four-step flow (capture_old → retain → reflect → diff) |
 | `fixtures/demo.json` | DEMO_MODE canned responses for every route |
@@ -48,13 +50,13 @@ Everything else verifies via curl, browser smoke-test, and the acceptance checkl
 | `app/briefing/[vendor]/page.tsx` | Briefing page (server component wrapping the client briefing) |
 | `app/briefing/[vendor]/BriefingClient.tsx` | Client component that owns toggle + fetch state |
 | `lib/api.ts` | Typed fetch client against backend |
-| `lib/types.ts` | Shared TS types (Tactic, Briefing, ScoreDiff, PipelineStep) |
+| `lib/types.ts` | Shared TS types (Tactic, Briefing, ScoreDiff, PipelineStep) — mirrors `backend/models.py` |
 | `components/VendorCard.tsx` | Dashboard card |
 | `components/TacticCard.tsx` | Tactic with 5-dot confidence, evidence, timing |
 | `components/Playbook.tsx` | Branching decision tree |
 | `components/AntiPatternSparkline.tsx` | Descending red SVG sparkline |
 | `components/MemoryToggle.tsx` | Hero toggle component |
-| `components/PipelineStatus.tsx` | Orchestration step trail |
+| `components/PipelineStatus.tsx` | Agents-SDK orchestration step trail (dark pill with live timings) |
 | `components/SignalFeed.tsx` | 2-item signals feed |
 | `components/PostCallForm.tsx` | Modal form for logging post-call notes |
 | `components/ScoreDiff.tsx` | Animated old → new display |
@@ -75,7 +77,7 @@ Everything else verifies via curl, browser smoke-test, and the acceptance checkl
 
 - [ ] **Step 1: Create Hindsight Cloud account** — sign up at https://hindsight.vectorize.io, apply promo code `MEMHACK409`. Capture `HINDSIGHT_API_KEY` and `HINDSIGHT_API_URL`.
 
-- [ ] **Step 2: Create CascadeFlow account** — sign up per sponsor landing page, capture `CASCADEFLOW_API_KEY` and `CASCADEFLOW_API_URL`. Read the SDK quickstart. Note which primitives exist (steps / pipelines / sub-agents).
+- [ ] **Step 2: Install + verify OpenAI Agents SDK** — `pip install openai-agents`. Skim the quickstart at https://openai.github.io/openai-agents-python/. Confirm `Agent`, `Runner`, `function_tool`, and `RunHooks` all import cleanly. No separate API key — the SDK reads `OPENAI_API_KEY`.
 
 - [ ] **Step 3: Verify OpenAI access** — confirm your `OPENAI_API_KEY` can hit `gpt-4o`. Run:
 
@@ -100,7 +102,32 @@ print(c.reflect(bank_id="sandbox"))
 
 Expected: response with Opinions/Observations shape. Save the shape to `docs/hindsight-reflect-shape.json` for reference.
 
-- [ ] **Step 5: Verify CascadeFlow round-trip** — write a throwaway script per sponsor quickstart. Expected: a step list with timings. Save the shape to `docs/cascadeflow-response-shape.json`.
+- [ ] **Step 5: Verify Agents SDK round-trip with a toy 2-tool agent** — write a throwaway script:
+
+```python
+import asyncio
+from agents import Agent, Runner, function_tool, RunHooks
+
+@function_tool
+def add(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
+
+class DebugHooks(RunHooks):
+    async def on_tool_start(self, context, agent, tool):
+        print(f"[start] {tool.name}")
+    async def on_tool_end(self, context, agent, tool, result):
+        print(f"[end]   {tool.name} -> {result}")
+
+async def main():
+    agent = Agent(name="Calc", model="gpt-4o", instructions="Use the add tool.", tools=[add])
+    r = await Runner.run(agent, "What is 2 + 3?", hooks=DebugHooks())
+    print("final:", r.final_output)
+
+asyncio.run(main())
+```
+
+Expected: hooks fire (`[start] add`, `[end] add -> 5`), final output contains "5". If this doesn't work, stop — investigate before continuing.
 
 ---
 
@@ -139,12 +166,13 @@ fastapi==0.109.0
 uvicorn[standard]==0.27.0
 pydantic==2.5.3
 python-dotenv==1.0.0
-openai==1.12.0
+openai>=1.50.0
+openai-agents>=0.2.0
 hindsight-client
-cascadeflow
 faker==22.0.0
 httpx==0.26.0
 pytest==7.4.4
+pytest-asyncio==0.23.3
 ```
 
 Install: `pip install -r requirements.txt`.
@@ -187,14 +215,14 @@ Expected: `{"ok":true}`.
 ```
 HINDSIGHT_API_URL=https://api.hindsight.vectorize.io
 HINDSIGHT_API_KEY=
-CASCADEFLOW_API_KEY=
-CASCADEFLOW_API_URL=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o
 DEMO_MODE=false
 CORS_ORIGINS=http://localhost:3000
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
+
+(The Agents SDK reads `OPENAI_API_KEY` from the environment. No extra keys needed.)
 
 - [ ] **Step 7: Commit + push:**
 
@@ -499,6 +527,30 @@ Rules:
 - Do NOT invent specific dates, dollar amounts, or contact names.
 - Output valid JSON only.
 """
+
+AGENT_INSTRUCTIONS = """You are BriefingAgent. Your job: produce a negotiation
+briefing for one vendor as strict JSON.
+
+You MUST follow this exact pipeline, in order:
+1. Call the `recall_memories` tool with the bank_id you were given.
+2. Using ONLY the returned Hindsight data, produce the briefing JSON described below.
+3. Call the `rank_tactics` tool with the JSON array of tactics to sort them.
+4. Return the complete briefing JSON as your final output. No prose, no markdown.
+
+The final output schema:
+{ "tactics": [<tactic>...], "playbook": {"opening": {...}, "branches": [...]},
+  "temporal_signals": [...], "recent_signals": [...] }
+
+Each tactic MUST include: name, confidence (float 0-1), evidence (dated reference),
+timing, successes, total_uses, last_used_date, is_anti_pattern. For any tactic with
+confidence < 0.20 AND >= 2 failed uses, set is_anti_pattern=true and include a
+history array of 4-5 {date, confidence} points showing descending trend.
+
+Always provide 2-4 playbook branches phrased as "If <vendor_contact> says/does X".
+At most one level of followup per branch.
+
+Do not invent facts. Output valid JSON only.
+"""
 ```
 
 - [ ] **Step 2: Commit:**
@@ -629,70 +681,194 @@ git add backend/models.py && git commit -m "feat(backend): Pydantic schemas"
 
 ---
 
-### Task B5: CascadeFlow wrapper
+### Task B5: Agents SDK pipeline (`pipeline.py`)
 
 **Files:**
-- Create: `backend/cascade.py`
+- Create: `backend/pipeline.py`
 
-- [ ] **Step 1: Write `backend/cascade.py`** — thin wrapper that emits step timings. The exact CascadeFlow SDK calls depend on Task P1's doc-reading; if the SDK signature differs, adapt here only. The step-timing contract stays stable.
+This module defines the `BriefingAgent` + its three function tools, the `PipelineHooks` class that captures tool-call timings, and `run_briefing()` — the async entry point used by both `/api/briefing` and `/api/ingest`.
+
+- [ ] **Step 1: Write `backend/pipeline.py`:**
 
 ```python
-"""CascadeFlow orchestration wrapper.
+"""OpenAI Agents SDK orchestration for LEVERAGE.
 
-Wraps the briefing and ingest pipelines so each step emits a timing. If
-CascadeFlow SDK calls fail, the step records status=error but the pipeline
-continues — pipeline_trail is cosmetic, not load-bearing on the data path.
+A single BriefingAgent with three function tools:
+  - recall_memories(bank_id)       -> JSON string of Hindsight Opinions
+  - synthesize_briefing(vendor_name, memories_json) -> JSON string of tactics+playbook
+  - rank_tactics(tactics_json)     -> JSON string of tactics sorted desc by confidence
+
+The agent's AGENT_INSTRUCTIONS enforces the call order (recall -> synthesize -> rank).
+PipelineHooks captures per-tool timings for the pipeline_trail UI surface.
+
+`synthesize_briefing` makes a second OpenAI call internally using BRIEFING_PROMPT with
+response_format=json_object — this keeps JSON shape reliable even if the agent's own
+LLM turn tries to paraphrase. The agent is, effectively, the orchestrator; synthesis
+happens inside the tool.
 """
+from __future__ import annotations
+import json
 import os
 import time
-from contextlib import contextmanager
-from typing import Callable, List
+from typing import Any, List, Optional
+
+from agents import Agent, Runner, RunHooks, function_tool
+from openai import OpenAI
+
+from prompts import AGENT_INSTRUCTIONS, BRIEFING_PROMPT
 from models import PipelineStep
 
-USE_CASCADEFLOW = bool(os.environ.get("CASCADEFLOW_API_KEY"))
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+_openai = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
 
-try:
-    from cascadeflow import CascadeFlow  # type: ignore
-    _cf_client = CascadeFlow(api_key=os.environ.get("CASCADEFLOW_API_KEY", "")) if USE_CASCADEFLOW else None
-except Exception:
-    _cf_client = None
+# Module-level Hindsight client reference — set by main.py at startup.
+# Tools can't take arbitrary objects as parameters (args must be JSON-serializable),
+# so we stash the client here.
+_hindsight: Optional[Any] = None
 
 
-class CascadeTrail:
-    """Collects step timings for the response."""
+def set_hindsight_client(client: Any) -> None:
+    global _hindsight
+    _hindsight = client
 
-    def __init__(self):
+
+# --------- Tools ---------
+
+@function_tool
+def recall_memories(bank_id: str) -> str:
+    """Recall Hindsight memories (Opinions, Observations, recent Experiences) for a vendor.
+
+    Args:
+        bank_id: Hindsight bank identifier (e.g., 'nexacloud', 'datapipe', 'securenet').
+
+    Returns:
+        JSON string of the recalled memory payload.
+    """
+    assert _hindsight is not None, "pipeline.set_hindsight_client() was never called"
+    opinions = _hindsight.reflect(bank_id=bank_id)
+    return json.dumps(opinions, default=str)
+
+
+@function_tool
+def synthesize_briefing(vendor_name: str, memories_json: str) -> str:
+    """Synthesize a negotiation briefing JSON from recalled memories.
+
+    Uses gpt-4o with BRIEFING_PROMPT in strict JSON mode.
+
+    Args:
+        vendor_name: Display name of the vendor (e.g., 'NexaCloud').
+        memories_json: JSON string returned by recall_memories.
+
+    Returns:
+        JSON string with { tactics[], playbook{...}, temporal_signals[], recent_signals[] }.
+    """
+    user_content = f"Vendor: {vendor_name}\n\nHindsight data:\n{memories_json}"
+    resp = _openai.chat.completions.create(
+        model=MODEL,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": BRIEFING_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
+        temperature=0.2,
+    )
+    return resp.choices[0].message.content or "{}"
+
+
+@function_tool
+def rank_tactics(tactics_json: str) -> str:
+    """Sort a JSON array of tactics by confidence descending. Returns the sorted JSON."""
+    tactics = json.loads(tactics_json)
+    tactics.sort(key=lambda t: t.get("confidence", 0.0), reverse=True)
+    return json.dumps(tactics)
+
+
+# --------- Agent ---------
+
+BRIEFING_AGENT = Agent(
+    name="BriefingAgent",
+    model=MODEL,
+    instructions=AGENT_INSTRUCTIONS,
+    tools=[recall_memories, synthesize_briefing, rank_tactics],
+)
+
+
+# --------- Hooks ---------
+
+_TOOL_LABELS = {
+    "recall_memories": "Recalling memories from Hindsight",
+    "synthesize_briefing": "Synthesizing tactics via gpt-4o",
+    "rank_tactics": "Ranking tactics by confidence",
+}
+
+
+class PipelineHooks(RunHooks):
+    """Captures tool lifecycle events as an ordered pipeline_trail."""
+
+    def __init__(self) -> None:
         self.steps: List[PipelineStep] = []
+        self._starts: dict[str, float] = {}
 
-    @contextmanager
-    def step(self, step_name: str, label: str = ""):
-        start = time.perf_counter()
-        status = "ok"
-        try:
-            # Announce step to CascadeFlow if SDK available. Best-effort only.
-            if _cf_client is not None:
-                try:
-                    _cf_client.emit(step=step_name, label=label)  # type: ignore[attr-defined]
-                except Exception:
-                    pass
-            yield
-        except Exception:
-            status = "error"
-            raise
-        finally:
-            ms = int((time.perf_counter() - start) * 1000)
-            self.steps.append(PipelineStep(step=step_name, status=status, ms=ms, label=label or None))
+    async def on_tool_start(self, context, agent, tool) -> None:
+        self._starts[tool.name] = time.perf_counter()
 
-    def to_list(self) -> List[PipelineStep]:
-        return self.steps
+    async def on_tool_end(self, context, agent, tool, result) -> None:
+        t0 = self._starts.pop(tool.name, time.perf_counter())
+        ms = int((time.perf_counter() - t0) * 1000)
+        self.steps.append(PipelineStep(
+            step=tool.name,
+            status="ok",
+            ms=ms,
+            label=_TOOL_LABELS.get(tool.name, tool.name),
+        ))
+
+
+# --------- Entry point ---------
+
+async def run_briefing(bank_id: str, vendor_meta: dict) -> tuple[dict, List[PipelineStep]]:
+    """Run the BriefingAgent pipeline. Returns (briefing_raw_dict, pipeline_trail).
+
+    The agent's final_output is the fully-ranked briefing JSON.
+    """
+    hooks = PipelineHooks()
+    user_input = (
+        f"Build a negotiation briefing for vendor '{vendor_meta['name']}' "
+        f"(bank_id='{bank_id}'). Contact: {vendor_meta['contact']}. "
+        f"Contract ${vendor_meta['annual_value']:,}/yr, renewal {vendor_meta['renewal_date']}. "
+        f"Follow your instructions exactly: recall -> synthesize -> rank. "
+        f"Return the complete briefing JSON as your final answer."
+    )
+    result = await Runner.run(BRIEFING_AGENT, input=user_input, hooks=hooks)
+    raw = json.loads(result.final_output)
+    return raw, hooks.steps
+
+
+def extract_briefing(raw: dict, vendor_meta: dict, bank_id: str, trail: List[PipelineStep]):
+    """Assemble the full Briefing Pydantic model from the agent's raw output."""
+    from briefing import _days_remaining  # local import to avoid circular
+    from models import Briefing
+    return Briefing(
+        vendor=bank_id,
+        contract={
+            "value": vendor_meta["annual_value"],
+            "renewal_date": vendor_meta["renewal_date"],
+            "days_remaining": _days_remaining(vendor_meta["renewal_date"]),
+            "contact": vendor_meta["contact"],
+        },
+        tactics=raw.get("tactics", []),
+        playbook=raw["playbook"],
+        temporal_signals=raw.get("temporal_signals", []),
+        recent_signals=raw.get("recent_signals", []),
+        pipeline_trail=[s.model_dump() for s in trail],
+    )
 ```
 
-> If the real CascadeFlow SDK exposes richer primitives (pipelines, sub-agents), replace `_cf_client.emit()` with the appropriate call. The `CascadeTrail` context-manager contract must stay the same — everything downstream depends on `steps`.
+> Tracing note: the Agents SDK ships with built-in tracing that uploads traces to OpenAI's dashboard. For a private hackathon demo you may want `RUN_TRACE_DISABLED=1` in env. Not required.
 
 - [ ] **Step 2: Commit:**
 
 ```bash
-git add backend/cascade.py && git commit -m "feat(backend): CascadeFlow wrapper with step timings"
+git add backend/pipeline.py && git commit -m "feat(backend): Agents SDK BriefingAgent + PipelineHooks"
 ```
 
 ---
@@ -747,21 +923,19 @@ cd backend && pytest tests/test_confidence.py -v
 
 Expected: FAIL — `ModuleNotFoundError: briefing`.
 
-- [ ] **Step 3: Write minimal `backend/briefing.py` with just the confidence formula:**
+- [ ] **Step 3: Write minimal `backend/briefing.py` with just the confidence formula + `_days_remaining` helper + an async `build_briefing` that calls into `pipeline.run_briefing`:**
 
 ```python
-"""Briefing synthesis: Hindsight reflect() → OpenAI → tactics JSON."""
-import json
-import os
+"""Briefing adapter: confidence formula + thin wrapper calling the Agents-SDK pipeline.
+
+Heavy orchestration lives in pipeline.py. This module exists so:
+  - the confidence formula has a natural home and is importable by tests
+  - main.py has a stable `build_briefing(bank_id, vendor_meta)` surface
+  - ingest.py can reuse `build_briefing` twice without knowing about the SDK
+"""
 from datetime import datetime
-from openai import OpenAI
-
-from prompts import BRIEFING_PROMPT
-from cascade import CascadeTrail
 from models import Briefing
-
-_openai = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
-MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+from pipeline import run_briefing, extract_briefing
 
 
 def confidence(successes: int, total_uses: int, months_since_last_use: float) -> float:
@@ -776,75 +950,41 @@ def confidence(successes: int, total_uses: int, months_since_last_use: float) ->
     base = successes / total_uses
     recency_decay = max(0.3, 0.9 ** months_since_last_use)
     return round(base * recency_decay, 2)
-```
 
-- [ ] **Step 4: Run tests, confirm pass:**
-
-```bash
-cd backend && pytest tests/test_confidence.py -v
-```
-
-Expected: all 6 tests PASS.
-
-- [ ] **Step 5: Extend `backend/briefing.py`** with the Hindsight + OpenAI pipeline:
-
-```python
-# ... keep everything above ...
 
 def _days_remaining(renewal_date: str) -> int:
     target = datetime.strptime(renewal_date, "%Y-%m-%d")
     return max(0, (target - datetime.utcnow()).days)
 
 
-def _openai_synthesize(vendor_name: str, opinions_payload: dict) -> dict:
-    """Call OpenAI with the BRIEFING_PROMPT. Returns parsed JSON or raises."""
-    user_content = (
-        f"Vendor: {vendor_name}\n\n"
-        f"Hindsight data:\n{json.dumps(opinions_payload, default=str)}"
-    )
-    resp = _openai.chat.completions.create(
-        model=MODEL,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": BRIEFING_PROMPT},
-            {"role": "user", "content": user_content},
-        ],
-        temperature=0.2,
-    )
-    return json.loads(resp.choices[0].message.content)
-
-
-def build_briefing(bank_id: str, vendor_meta: dict, hindsight_client) -> Briefing:
-    """Full briefing pipeline: recall → synthesize → rank. Wrapped by CascadeTrail."""
-    trail = CascadeTrail()
-
-    with trail.step("recall", label=f"Recalling memories from Hindsight ({vendor_meta['name']})"):
-        opinions = hindsight_client.reflect(bank_id=bank_id)
-
-    with trail.step("synthesize", label="Synthesizing tactics via OpenAI"):
-        raw = _openai_synthesize(vendor_meta["name"], opinions)
-
-    with trail.step("rank", label="Ranking tactics by confidence"):
-        raw["tactics"] = sorted(raw["tactics"], key=lambda t: t["confidence"], reverse=True)
-
-    briefing_dict = {
-        "vendor": bank_id,
-        "contract": {
-            "value": vendor_meta["annual_value"],
-            "renewal_date": vendor_meta["renewal_date"],
-            "days_remaining": _days_remaining(vendor_meta["renewal_date"]),
-            "contact": vendor_meta["contact"],
-        },
-        **raw,
-        "pipeline_trail": [s.model_dump() for s in trail.to_list()],
-    }
-    return Briefing(**briefing_dict)
+async def build_briefing(bank_id: str, vendor_meta: dict) -> Briefing:
+    """Run the Agents SDK pipeline and assemble the final Briefing."""
+    raw, trail = await run_briefing(bank_id, vendor_meta)
+    return extract_briefing(raw, vendor_meta, bank_id, trail)
 ```
+
+- [ ] **Step 4: Run confidence tests, confirm pass:**
+
+```bash
+cd backend && pytest tests/test_confidence.py -v
+```
+
+Expected: all 6 tests PASS. (The formula doesn't touch the pipeline — these tests don't need OpenAI or Hindsight keys.)
+
+- [ ] **Step 5: Integration smoke** — start uvicorn and curl a briefing to confirm the Agents SDK pipeline end-to-end. (Skip if Hindsight banks aren't seeded yet; revisit after B8.)
+
+```bash
+cd backend && uvicorn main:app --reload --port 8000 &
+sleep 2
+curl "http://localhost:8000/api/briefing?vendor=nexacloud" | python -m json.tool | head -60
+```
+
+Expected: JSON with ≥4 tactics, `pipeline_trail` containing `recall_memories`, `synthesize_briefing`, `rank_tactics` steps with non-zero ms.
 
 - [ ] **Step 6: Commit:**
 
 ```bash
-git add backend/briefing.py backend/tests/ && git commit -m "feat(backend): briefing pipeline + confidence formula (tested)"
+git add backend/briefing.py backend/tests/ && git commit -m "feat(backend): briefing adapter + confidence formula (tested)"
 ```
 
 ---
@@ -913,7 +1053,6 @@ VENDOR_META = {
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 import os
-from datetime import datetime
 from hindsight_client import HindsightClient
 
 from models import VendorListResponse, Vendor, Briefing, NoMemoryResponse, IngestRequest, IngestResponse
@@ -921,6 +1060,7 @@ from vendors_meta import VENDOR_META
 from briefing import build_briefing, _days_remaining
 from nomemory import build_nomemory
 from ingest import run_ingest
+from pipeline import set_hindsight_client
 
 app = FastAPI(title="LEVERAGE")
 
@@ -931,6 +1071,8 @@ _hindsight = HindsightClient(
     api_key=os.environ.get("HINDSIGHT_API_KEY", ""),
     base_url=os.environ.get("HINDSIGHT_API_URL", "https://api.hindsight.vectorize.io"),
 )
+# Hand the client to the Agents SDK tool layer at startup.
+set_hindsight_client(_hindsight)
 
 
 @app.get("/health")
@@ -956,10 +1098,10 @@ def list_vendors():
 
 
 @app.get("/api/briefing", response_model=Briefing)
-def get_briefing(vendor: str = Query(...)):
+async def get_briefing(vendor: str = Query(...)):
     if vendor not in VENDOR_META:
         raise HTTPException(404, f"Unknown vendor {vendor}")
-    return build_briefing(vendor, VENDOR_META[vendor], _hindsight)
+    return await build_briefing(vendor, VENDOR_META[vendor])
 
 
 @app.post("/api/briefing/nomemory", response_model=NoMemoryResponse)
@@ -970,10 +1112,10 @@ def get_nomemory(vendor: str = Query(...)):
 
 
 @app.post("/api/ingest", response_model=IngestResponse)
-def post_ingest(req: IngestRequest):
+async def post_ingest(req: IngestRequest):
     if req.vendor not in VENDOR_META:
         raise HTTPException(404, f"Unknown vendor {req.vendor}")
-    return run_ingest(req, VENDOR_META[req.vendor], _hindsight)
+    return await run_ingest(req, VENDOR_META[req.vendor], _hindsight)
 ```
 
 > Note: this step references `ingest.run_ingest` which is created in Task B9 next. If running tasks strictly in order, temporarily stub: comment out the `/api/ingest` route and the `from ingest import run_ingest` line until B9 is done.
@@ -1083,11 +1225,17 @@ Expected: FAIL — `ModuleNotFoundError: ingest`.
 - [ ] **Step 3: Write `backend/ingest.py`:**
 
 ```python
-"""Post-call ingest flow: capture_old → retain → reflect → diff."""
+"""Post-call ingest flow: capture_old → retain → reflect → diff.
+
+The capture_old and reflect steps each run the full Agents SDK BriefingAgent
+(via briefing.build_briefing). Their internal tool-level trails are discarded;
+the ingest response emits its own 4-step outer trail measured with
+time.perf_counter() around each phase.
+"""
+import time
 from typing import List, Dict
-from cascade import CascadeTrail
 from briefing import build_briefing
-from models import IngestRequest, IngestResponse, ScoreDiff
+from models import IngestRequest, IngestResponse, ScoreDiff, PipelineStep
 
 DIFF_THRESHOLD = 0.01
 
@@ -1113,33 +1261,44 @@ def compute_diffs(old_tactics: List[dict], new_tactics: List[dict]) -> Dict[str,
     return diffs
 
 
-def run_ingest(req: IngestRequest, vendor_meta: dict, hindsight_client) -> IngestResponse:
-    """Four-step §5.4 flow wrapped in CascadeTrail."""
-    trail = CascadeTrail()
+async def run_ingest(req: IngestRequest, vendor_meta: dict, hindsight_client) -> IngestResponse:
+    """Four-step §5.4 flow with outer step timings."""
+    trail: List[PipelineStep] = []
 
-    with trail.step("capture_old_scores", label="Snapshotting current confidences"):
-        old_briefing = build_briefing(req.vendor, vendor_meta, hindsight_client)
-        old_tactics = [t.model_dump() for t in old_briefing.tactics]
+    def _timed_step(name: str, label: str, ms: int, status: str = "ok") -> None:
+        trail.append(PipelineStep(step=name, status=status, ms=ms, label=label))
 
-    with trail.step("retain", label="Storing new interaction in Hindsight"):
-        hindsight_client.retain(
-            bank_id=req.vendor,
-            experience=req.notes,
-            metadata={"outcome": req.outcome, "timestamp": req.timestamp, "type": "call"},
-        )
+    # 1. capture_old_scores
+    t0 = time.perf_counter()
+    old_briefing = await build_briefing(req.vendor, vendor_meta)
+    old_tactics = [t.model_dump() for t in old_briefing.tactics]
+    _timed_step("capture_old_scores", "Snapshotting current confidences", int((time.perf_counter() - t0) * 1000))
 
-    with trail.step("reflect", label="Re-synthesizing tactics"):
-        new_briefing = build_briefing(req.vendor, vendor_meta, hindsight_client)
-        new_tactics = [t.model_dump() for t in new_briefing.tactics]
+    # 2. retain
+    t0 = time.perf_counter()
+    hindsight_client.retain(
+        bank_id=req.vendor,
+        experience=req.notes,
+        metadata={"outcome": req.outcome, "timestamp": req.timestamp, "type": "call"},
+    )
+    _timed_step("retain", "Storing new interaction in Hindsight", int((time.perf_counter() - t0) * 1000))
 
-    with trail.step("diff", label="Computing score diffs"):
-        diffs_raw = compute_diffs(old_tactics, new_tactics)
-        score_diffs = {k: ScoreDiff(**v) for k, v in diffs_raw.items()}
+    # 3. reflect (re-run briefing)
+    t0 = time.perf_counter()
+    new_briefing = await build_briefing(req.vendor, vendor_meta)
+    new_tactics = [t.model_dump() for t in new_briefing.tactics]
+    _timed_step("reflect", "Re-synthesizing tactics via BriefingAgent", int((time.perf_counter() - t0) * 1000))
 
-    # Swap the briefing's pipeline_trail with the ingest trail (frontend expects it).
-    new_briefing.pipeline_trail = trail.to_list()
+    # 4. diff
+    t0 = time.perf_counter()
+    diffs_raw = compute_diffs(old_tactics, new_tactics)
+    score_diffs = {k: ScoreDiff(**v) for k, v in diffs_raw.items()}
+    _timed_step("diff", "Computing score diffs", int((time.perf_counter() - t0) * 1000))
 
-    return IngestResponse(briefing=new_briefing, score_diffs=score_diffs, pipeline_trail=trail.to_list())
+    # Replace the briefing's pipeline_trail with the ingest outer trail.
+    new_briefing.pipeline_trail = trail
+
+    return IngestResponse(briefing=new_briefing, score_diffs=score_diffs, pipeline_trail=trail)
 ```
 
 - [ ] **Step 4: Run tests, confirm pass:**
@@ -1604,7 +1763,7 @@ export function PipelineStatus({ trail }: { trail: PipelineStep[] }) {
   if (!trail?.length) return null;
   return (
     <div className="mb-8 rounded-lg border border-neutral-200 bg-neutral-900 p-4 font-mono text-sm text-neutral-100">
-      <div className="mb-2 text-xs uppercase tracking-widest text-neutral-400">CascadeFlow</div>
+      <div className="mb-2 text-xs uppercase tracking-widest text-neutral-400">Agents SDK Pipeline</div>
       {trail.map((s, i) => (
         <div key={i} className="flex items-center gap-3">
           <span className={s.status === "ok" ? "text-emerald-400" : s.status === "error" ? "text-red-400" : "text-neutral-500"}>
@@ -1981,7 +2140,7 @@ Expected: both 200.
 # LEVERAGE
 
 Vendor Negotiation Intelligence Agent.
-Memory is the product — powered by Hindsight Cloud, orchestrated by CascadeFlow.
+Memory is the product — powered by Hindsight Cloud, orchestrated by the OpenAI Agents SDK.
 
 ## Demo
 - Live: https://<vercel-url>
@@ -1994,7 +2153,7 @@ Priya runs procurement at a 400-person SaaS. She renews 47 vendors a year. Every
 - Frontend: Next.js 15 (App Router) + TypeScript + Tailwind v3.4 on Vercel
 - Backend: FastAPI + Python 3.11 on Railway
 - Memory: Hindsight Cloud
-- Orchestration: CascadeFlow
+- Orchestration: OpenAI Agents SDK (`openai-agents`) — `BriefingAgent` with `recall_memories`, `synthesize_briefing`, `rank_tactics` tools
 - LLM: OpenAI gpt-4o
 
 ## Run locally
@@ -2072,5 +2231,5 @@ Execute every check in `spec.md §10`:
 
 ## Post-submission (outside 10-hr budget, ~60 min)
 
-- [ ] **Write a 400–600 word article** about the build. Focus: the MemoryToggle hero moment, the CascadeFlow trail, the $23,400 number. Publish on Dev.to or personal blog.
+- [ ] **Write a 400–600 word article** about the build. Focus: the MemoryToggle hero moment, the Agents SDK `PipelineStatus` trail, the $23,400 number. Publish on Dev.to or personal blog.
 - [ ] **LinkedIn post** — screenshot + 1-paragraph narrative + link to live demo.
