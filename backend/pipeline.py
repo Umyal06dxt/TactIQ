@@ -107,6 +107,7 @@ class PipelineHooks(RunHooks):
 
 async def run_briefing(bank_id: str, vendor_meta: dict) -> tuple[dict, List[PipelineStep]]:
     """Run BriefingAgent pipeline. Returns (raw_dict, pipeline_trail)."""
+    from agents import ToolCallOutputItem
     hooks = PipelineHooks()
     user_input = (
         f"Build a negotiation briefing for vendor '{vendor_meta['name']}' "
@@ -116,7 +117,21 @@ async def run_briefing(bank_id: str, vendor_meta: dict) -> tuple[dict, List[Pipe
         f"Return the complete briefing JSON as your final answer."
     )
     result = await Runner.run(BRIEFING_AGENT, input=user_input, hooks=hooks)
-    raw = json.loads(result.final_output)
+
+    output_str = result.final_output
+    if not output_str:
+        # Agent ended after tool calls without a text response — extract synthesize_briefing output
+        for item in reversed(result.new_items):
+            if isinstance(item, ToolCallOutputItem):
+                candidate = item.output
+                if isinstance(candidate, str) and candidate.strip().startswith("{"):
+                    output_str = candidate
+                    break
+
+    if not output_str:
+        raise RuntimeError(f"BriefingAgent returned no output for {bank_id}")
+
+    raw = json.loads(output_str)
     # Agent sometimes wraps output: {"briefing": {...}} — unwrap if needed
     if "briefing" in raw and "tactics" not in raw:
         raw = raw["briefing"]
@@ -131,6 +146,7 @@ def _norm_playbook(pb) -> dict:
     opening = pb.get("opening", {})
     if isinstance(opening, str):
         opening = {"move": opening, "rationale": "", "tactic_ref": ""}
+    opening.setdefault("move", "")
     opening.setdefault("rationale", "")
     opening.setdefault("tactic_ref", "")
 
