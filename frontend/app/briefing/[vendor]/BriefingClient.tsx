@@ -49,15 +49,22 @@ export function BriefingClient({ vendor, initial }: { vendor: string; initial: B
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
-      <header className="mb-8 flex items-baseline justify-between">
+      <header className="mb-8 border-b border-neutral-200 pb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">{vendor.toUpperCase()}</h1>
-          <p className="text-neutral-600">
-            Contact {briefing.contract.contact} · ${briefing.contract.value.toLocaleString()}/yr ·
-            Renewal {briefing.contract.renewal_date} · <span className="text-red-700 font-medium">{briefing.contract.days_remaining} days</span>
+          <div className="flex items-center gap-3 mb-1">
+            <a href="/" className="text-sm text-neutral-400 hover:text-neutral-600">← Dashboard</a>
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900">{vendor.toUpperCase()}</h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            Contact <span className="font-medium text-gray-700">{briefing.contract.contact}</span>
+            {" · "}${briefing.contract.value.toLocaleString()}/yr
+            {" · "}Renewal {briefing.contract.renewal_date}
+            {" · "}<span className="font-semibold text-red-600">{briefing.contract.days_remaining} days remaining</span>
           </p>
         </div>
-        <MemoryToggle value={memoryOn} onChange={toggleMemory} />
+        <div className="shrink-0 pt-1">
+          <MemoryToggle value={memoryOn} onChange={toggleMemory} />
+        </div>
       </header>
 
       <PipelineStatus trail={briefing.pipeline_trail} />

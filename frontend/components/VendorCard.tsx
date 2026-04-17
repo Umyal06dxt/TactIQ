@@ -6,7 +6,7 @@ export function VendorCard({ v }: { v: Vendor }) {
   return (
     <Link
       href={`/briefing/${v.bank_id}`}
-      className="block rounded-xl border border-neutral-200 bg-white p-6 shadow-sm transition hover:shadow-md"
+      className="block rounded-xl border border-neutral-200 bg-white p-6 shadow-sm transition hover:shadow-lg hover:-translate-y-0.5"
     >
       <div className="flex items-start justify-between">
         <h3 className="text-xl font-semibold">{v.name}</h3>
