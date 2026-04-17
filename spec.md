@@ -1,22 +1,24 @@
 # LEVERAGE — Build Specification
 
-> Vendor Negotiation Intelligence Agent  
-> Stack: Next + FastAPI + Hindsight Cloud + gpt-5-4 + CascadeFlow  
-> Hackathon: CascadeFlow + Hindsight  
+> Vendor Negotiation Intelligence Agent
+> Stack: Next.js 15 (App Router) + FastAPI + OpenAI Agents SDK + Hindsight Cloud + OpenAI
+> Hackathon: Hindsight (CascadeFlow replaced with OpenAI Agents SDK — CascadeFlow was waitlist-gated)
 > Promo code: `MEMHACK409` (for $50 Hindsight Cloud credits)
+> Status: v3 (CascadeFlow → OpenAI Agents SDK, Groq removed, OpenAI-only, build plan inlined)
 
 ---
 
 ## 1. Goal
 
-Build a buyer-side vendor negotiation memory tool. A procurement manager clicks a vendor, sees a briefing with confidence-scored tactics drawn from past interactions, logs what happened after the call, and watches the confidence scores update live. Memory is the product — without Hindsight the app has nothing to show.
+Build a buyer-side vendor negotiation memory tool. A procurement manager (Priya) clicks a vendor, sees a briefing with confidence-scored tactics drawn from past interactions, logs what happened after the call, and watches the confidence scores update live. **Memory is the product — without Hindsight the app is a ChatGPT wrapper.** The **OpenAI Agents SDK** is the visible nervous system that orchestrates every briefing and every ingest as a multi-step agent pipeline (`recall → synthesize → rank`); each tool invocation emits a lifecycle event that drives the `PipelineStatus` UI trail on screen.
 
-**Demo arc (two beats — both must be flawless):**
+### 1.1 Demo arc (the two beats that win the hackathon)
 
-1. **Opening beat** — flip the Memory toggle OFF. Briefing collapses to generic Groq advice, empty playbook placeholder. Flip ON. Hindsight-powered briefing materialises: branching playbook, named tactics with dated evidence, anti-pattern sparkline pinned at the bottom. This is the A/B that sells Hindsight.
-2. **Closing beat** — post-call log submit. Score diffs animate (green up / red down), the playbook visibly redraws in place, moves tied to changed tactics flash green/red. This is the "chess engine reevaluates" moment.
+**Opening beat — the A/B that sells Hindsight + OpenAI Agents SDK.**
+Priya opens the NexaCloud briefing. MemoryToggle is OFF → generic, textbook advice from OpenAI with no vendor context. She flips it ON. The `PipelineStatus` trail renders three live lines — `recall → synthesize → rank` — with real measured latencies captured from the Agents SDK lifecycle hooks. Four scored tactics materialise: a branching playbook, named tactics with dated evidence (`Mention AWS — 0.87, 2/2, last worked May 2024`), and an anti-pattern sparkline (`Cancellation threat — 0.12, AVOID`) pinned at the bottom.
 
-Everything else is secondary.
+**Closing beat — the memory compounds in real time.**
+Priya logs post-call notes: "Marcus pushed back when I mentioned AWS. Offered a 3-year commitment unprompted — 8% discount plus roadmap access." Submit. `PipelineStatus` flashes again with the four-step ingest trail (`capture_old → retain → reflect → diff`). ScoreDiff animates: AWS mention `0.87 → 0.79` (red arrow down), Multi-year commitment `0.50 → 0.68` (green arrow up). The playbook cross-fades and the changed moves flash green/red for 800ms. One dollar number lands: "Priya just saved $23,400 on this call. $1.1M/year across 47 vendors."
 
 ---
 
@@ -25,26 +27,30 @@ Everything else is secondary.
 ### 2.1 Must-build (P0 — ship these first, in order)
 
 1. Hindsight Cloud account + env setup using promo code `MEMHACK409`
-2. **Vendor seeder** — Python script seeding 3 vendors with ~53 synthetic interactions via `retain()`
-3. **Vendor dashboard** — list of 3 vendors with contract value, renewal date, days remaining (red <30d), interaction count
-4. **Pre-call briefing** — click vendor → `reflect()` → render tactic cards + temporal banner + recent signals
-5. **Confidence score display** — tactic card with name, 5-dot rating (colour-coded), numeric score, evidence, timing
-6. **Playbook (ordered script)** — branching negotiation play generated from top tactics, rendered as a decision tree above the tactic cards ("chess engine" moment — this is the demo's centre of gravity)
-7. **Anti-pattern sparkline** — at least one tactic card displays a small descending sparkline showing confidence decay over time (e.g. "Cancellation threat — dropping since 2022"), red border, "AVOID" tag
-8. **Before/after memory toggle** — switch on briefing screen. OFF → `POST /api/briefing/nomemory` (Groq with just vendor name, generic advice). ON → `GET /api/briefing` (Hindsight). Opens the demo; the A/B contrast is what sells Hindsight.
-9. **Post-call logger** — text form → `retain()` → `reflect()` → return updated scores + diffs + redrawn playbook
-10. **Live score update animation** — old → new value, green if up, red if down. Playbook visibly redraws in place.
+2. `openai-agents` Python SDK installed; verify a trivial `Agent` + `Runner.run_streamed()` round-trip
+3. Seeder that populates 3 Hindsight banks with ~30 synthetic interactions (see §4.1, §7)
+4. Backend routes: `/api/vendors`, `/api/briefing`, `/api/briefing/nomemory`, `/api/ingest`, `/health`
+5. Agents-SDK pipeline (`pipeline.py`) — a `BriefingAgent` with `recall_memories`, `synthesize_briefing`, `rank_tactics` tools; a `RunHooks` subclass that captures tool-level timings into a `pipeline_trail` for every briefing + every ingest
+6. Dashboard page with 3 vendor cards, red temporal badge on the renewal-urgent vendor
+7. Briefing page with: MemoryToggle (the hero), 4 TacticCards, branching Playbook, AntiPatternSparkline, SignalFeed (2 items), `PipelineStatus` trail
+8. PostCallForm + ScoreDiff with green-up / red-down arrows and CSS transitions
+9. Deploy: frontend on Vercel, backend on Railway, deploy smoke before hour 8
+10. Backup demo video recorded at hour 8.5, hosted as a GitHub Release asset
 
 ### 2.2 Nice-to-have (P1 — only after P0 is complete)
 
-- Confidence evolution chart (Recharts LineChart) — extends the anti-pattern sparkline into full per-tactic history
-- Email ingestion parser (paste thread → Groq extract → `retain()`)
-- Vendor comparison panel
-- Interaction timeline
+- Confidence evolution chart (Recharts `LineChart` of `history[]` per tactic)
+- Email ingestion parser (`POST /api/email/parse`)
+- Vendor comparison panel (side-by-side 3 vendors' top tactics)
+- Interaction timeline (vertical, dated, filterable)
 
 ### 2.3 Out of scope (do not build)
 
-Real email/CRM integrations, OAuth, live call transcription, multi-user auth, mobile responsive, billing pages, outbound scheduling.
+- Auth, multi-tenant, SSO, RBAC
+- Real CRM integrations (Salesforce, HubSpot, Gong)
+- Email-provider OAuth (Gmail, Outlook)
+- Payment / billing
+- Mobile responsive below 1024px — demo is desktop only
 
 ---
 
@@ -52,68 +58,89 @@ Real email/CRM integrations, OAuth, live call transcription, multi-user auth, mo
 
 ### 3.1 Components
 
+| Layer          | Tech                          | Version / Notes                |
+|----------------|-------------------------------|--------------------------------|
+| Frontend       | Next.js (App Router) + TypeScript | Next.js **15.x**, React 18, TS 5.x |
+| Styling        | Tailwind CSS                  | v3.4                           |
+| HTTP client    | `fetch` (native) or Axios     | Axios v1.6 optional            |
+| Charts         | Recharts (or inline SVG)      | v2.10                          |
+| Backend        | Python + FastAPI              | Python 3.11, FastAPI 0.109     |
+| Orchestration  | **OpenAI Agents SDK**         | `openai-agents` pip (`pip install openai-agents`) |
+| Memory         | **Hindsight Cloud**           | `hindsight-client` pip         |
+| LLM            | **OpenAI**                    | `openai` pip, model `gpt-4o` (fallback `gpt-4o-mini`) |
+| Data gen       | Faker                         | v22.0                          |
+| Frontend host  | Vercel                        | free tier, auto-deploy from `main` |
+| Backend host   | Railway                       | free tier, Dockerfile deploy   |
 
-| Layer         | Tech             | Version                    |
-| ------------- | ---------------- | -------------------------- |
-| Frontend      | Next             | Next16                     |
-| Styling       | Tailwind CSS     | v3.4                       |
-| HTTP client   | Axios            | v1.6                       |
-| Charts        | Recharts (or inline SVG) | v2.10              |
-| Backend       | Python + FastAPI | Python 3.11, FastAPI 0.109 |
-| Orchestration | CascadeFlow      | per docs                   |
-| Memory        | Hindsight Cloud  | `hindsight-client` pip     |
-| LLM           | OpenAI           | `gpt-5-4`                  |
-| Data gen      | Faker            | v22.0                      |
-| Frontend host | Vercel           | free tier                  |
-| Backend host  | AWS              | EC2                        |
+**Note:** We use **OpenAI for both** the memory-ON briefing synthesis AND the memory-OFF generic-advice endpoint. Groq is intentionally not part of this stack — one LLM provider = one failure mode. The nomemory endpoint uses a deliberately constrained prompt so its output stays visibly inferior to the Hindsight-powered briefing.
 
+**Why OpenAI Agents SDK instead of CascadeFlow:** CascadeFlow was the original hackathon sponsor for orchestration, but signup is waitlist-gated and we can't get keys in time. The Agents SDK is a drop-in replacement that serves the same "visible orchestration" demo beat — a `BriefingAgent` with three function tools (`recall_memories`, `synthesize_briefing`, `rank_tactics`) gives us real, deterministic step lifecycle events via `Runner.run_streamed()`. Every tool call emits a `run_item_stream_event` of type `tool_call_item` / `tool_call_output_item`, and `RunHooks.on_tool_start` / `on_tool_end` give us millisecond-accurate timings for the UI trail. This is strictly better than the hand-rolled timer we'd have otherwise used: named SDK, real lifecycle events, and built-in tracing we can surface later.
 
 ### 3.2 Folder structure
 
 ```
 leverage/
 ├── seeder/
-│   ├── seed_vendors.py        # entry point — runs once
-│   └── vendor_data.py         # 53 interaction records across 3 vendors
+│   ├── seed_vendors.py
+│   └── vendor_data.py              # 30 interactions total (23 + 4 + 3)
 ├── backend/
-│   ├── main.py                # FastAPI app, routes, CORS
-│   ├── briefing.py            # recall() + reflect() logic
-│   ├── ingest.py              # retain() + score diff computation
-│   ├── models.py              # Pydantic request/response schemas
-│   └── prompts.py             # BRIEFING_PROMPT string
-├── frontend/
-│   └── src/
-│       ├── App.jsx            # React Router
-│       ├── api.js             # Axios client wrapper
-│       ├── pages/
-│       │   ├── Dashboard.jsx
-│       │   └── Briefing.jsx
-│       └── components/
-│           ├── TacticCard.jsx
-│           ├── AntiPatternSparkline.jsx
-│           ├── Playbook.jsx
-│           ├── MemoryToggle.jsx
-│           ├── TemporalBanner.jsx
-│           ├── SignalFeed.jsx
-│           ├── PostCallForm.jsx
-│           └── ScoreDiff.jsx
+│   ├── main.py                     # FastAPI app, CORS, route wiring
+│   ├── briefing.py                 # confidence formula + thin adapter calling pipeline.run_briefing
+│   ├── ingest.py                   # §5.4 four-step flow (wraps pipeline + hindsight.retain)
+│   ├── nomemory.py                 # OpenAI-only generic-advice endpoint
+│   ├── pipeline.py                 # OpenAI Agents SDK: BriefingAgent + tools + RunHooks trail
+│   ├── models.py                   # Pydantic request/response schemas
+│   ├── prompts.py                  # BRIEFING_PROMPT + NOMEMORY_PROMPT + AGENT_INSTRUCTIONS
+│   ├── fixtures/
+│   │   └── demo.json               # DEMO_MODE canned responses
+│   ├── requirements.txt
+│   └── Dockerfile
+├── frontend/                       # Next.js 15 (App Router) + Tailwind v3.4
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── layout.tsx
+│   │   │   ├── page.tsx            # Dashboard
+│   │   │   └── briefing/[vendor]/
+│   │   │       └── page.tsx
+│   │   ├── lib/
+│   │   │   ├── api.ts              # typed client against backend
+│   │   │   └── types.ts            # shared TS types
+│   │   └── components/
+│   │       ├── VendorCard.tsx
+│   │       ├── TacticCard.tsx
+│   │       ├── Playbook.tsx
+│   │       ├── AntiPatternSparkline.tsx
+│   │       ├── MemoryToggle.tsx        # hero component
+│   │       ├── PipelineStatus.tsx      # Agents-SDK orchestration trail
+│   │       ├── SignalFeed.tsx
+│   │       ├── PostCallForm.tsx
+│   │       └── ScoreDiff.tsx
+│   ├── tailwind.config.ts
+│   ├── next.config.mjs
+│   ├── tsconfig.json
+│   └── package.json
 ├── .env.example
-├── requirements.txt
-├── package.json
-└── README.md
+├── README.md
+└── LICENSE
 ```
 
 ### 3.3 Environment variables
 
-```bash
-# .env (backend)
+**Backend (`backend/.env`):**
+```
 HINDSIGHT_API_URL=https://api.hindsight.vectorize.io
 HINDSIGHT_API_KEY=...
-GROQ_API_KEY=...
-CASCADEFLOW_API_KEY=...
+OPENAI_API_KEY=...                         # used by both `openai` and `openai-agents`
+OPENAI_MODEL=gpt-4o                        # override to gpt-4o-mini if rate-limited
+DEMO_MODE=false                            # flip to true as stub fallback (§10)
+CORS_ORIGINS=http://localhost:3000,https://<your-vercel-app>.vercel.app
+```
 
-# .env (frontend)
-VITE_API_URL=http://localhost:8000
+The Agents SDK reads `OPENAI_API_KEY` from the environment directly — no second key to configure.
+
+**Frontend (`frontend/.env.local`):**
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000   # -> https://<railway-domain> in prod
 ```
 
 ---
@@ -122,39 +149,34 @@ VITE_API_URL=http://localhost:8000
 
 ### 4.1 Memory banks (one per vendor)
 
+| bank_id      | Vendor     | Annual value | Renewal | Contact      | Seed count |
+|--------------|------------|--------------|---------|--------------|------------|
+| `nexacloud`  | NexaCloud  | $380,000     | Dec 31  | Marcus Chen  | 23         |
+| `datapipe`   | DataPipe   | $120,000     | Mar 15  | Ananya Rao   | 4          |
+| `securenet`  | SecureNet  | $85,000      | Jul 1   | James Wu     | 3          |
 
-| bank_id     | Vendor    | Annual value | Renewal | Contact     | Seed count |
-| ----------- | --------- | ------------ | ------- | ----------- | ---------- |
-| `nexacloud` | NexaCloud | $380,000     | Dec 31  | Marcus Chen | 23         |
-| `datapipe`  | DataPipe  | $120,000     | Mar 15  | Ananya Rao  | 16         |
-| `securenet` | SecureNet | $85,000      | Jul 1   | James Wu    | 14         |
-
+**NexaCloud is the demo vendor** — 23 rich interactions support the 4 on-screen tactics. DataPipe and SecureNet are thin-but-present to prove the dashboard isn't a one-vendor mock.
 
 ### 4.2 Hindsight networks used
 
 - **World facts** — contract values, renewal dates, fiscal calendars, contact names
 - **Experiences** — call summaries, email summaries, contract events (raw history)
-- **Observations** — auto-synthesised patterns (Hindsight derives these)
+- **Observations** — auto-synthesised patterns (Hindsight derives these; synthesis takes time — see §7.3)
 - **Opinions** — confidence-scored beliefs with evidence (this is the UI centrepiece)
 
 ### 4.3 Patterns to embed (per vendor)
 
-**NexaCloud (primary demo vendor — 23 interactions: 3 contracts + 8 calls + 12 emails)**
-
-- AWS mention tactic → confidence `0.87` (2 successes: Nov 2023 5% discount; May 2024 3% + $8k support tier)
-- Fiscal Q3 pressure → confidence `0.74` (worked in 2022, 2023, 2024 when explicitly referenced)
-- Multi-year commitment → confidence `0.50` (raised unprompted Nov 18 2024, single data point)
-- Cancellation threat (2022) → confidence `0.12` (failed — flag as ineffective)
-
-**DataPipe (16 interactions: 2 contracts + 5 calls + 9 emails)**
-
-- Volume commitment tactic → confidence `0.68`
-- Competitor mention (Fivetran) → confidence `0.15` (negative, flag to avoid)
-
-**SecureNet (14 interactions: 2 contracts + 4 calls + 8 emails)**
-
-- Competitive bid (Okta, CrowdStrike quotes) → confidence `0.71` (8% discount)
-- Cancellation threat (2023) → confidence `0.10` (negative)
+- **NexaCloud (23 interactions: 3 contracts + 8 calls + 12 emails)**:
+  - AWS mention tactic → `0.87` (2/2 success, last worked May 2024)
+  - Fiscal Q3 pressure → `0.74` (3/4 success)
+  - Multi-year commitment → `0.50` (raised unprompted Nov 2024)
+  - Cancellation threat (2022) → `0.12` (anti-pattern, 0/3 success)
+- **DataPipe (4 interactions)**:
+  - Volume commitment → `0.68`
+  - Competitor mention (Fivetran) → `0.15` (anti-pattern)
+- **SecureNet (3 interactions)**:
+  - Competitive bid (Okta, CrowdStrike quotes) → `0.71`
+  - Cancellation threat (2023) → `0.10` (anti-pattern)
 
 ---
 
@@ -162,316 +184,210 @@ VITE_API_URL=http://localhost:8000
 
 ### 5.1 Routes
 
+| Method | Path                                     | Purpose                                          |
+|--------|------------------------------------------|--------------------------------------------------|
+| GET    | `/health`                                | Liveness probe (returns `{"ok": true}`)          |
+| GET    | `/api/vendors`                           | List 3 vendors with summary fields               |
+| GET    | `/api/briefing?vendor={bank_id}`         | Full Hindsight briefing, orchestrated by the Agents SDK BriefingAgent |
+| POST   | `/api/briefing/nomemory`                 | OpenAI-only generic advice, 3 tactics, no Hindsight |
+| POST   | `/api/ingest`                            | Log post-call note, return updated briefing + score diffs |
+| POST   | `/api/email/parse`                       | **P1** — parse a pasted email thread into an Experience |
 
-| Method | Path                                      | Purpose                                           |
-| ------ | ----------------------------------------- | ------------------------------------------------- |
-| `GET`  | `/api/vendors`                            | List 3 vendors with summary stats for dashboard   |
-| `GET`  | `/api/briefing?vendor={bank_id}`          | Generate briefing via `reflect()`                 |
-| `POST` | `/api/ingest`                             | Log post-call note, return briefing + score diffs |
-| `POST` | `/api/briefing/nomemory?vendor={bank_id}` | Groq-only briefing (no Hindsight) — powers the A/B toggle |
-| `POST` | `/api/email/parse`                        | P1: parse email thread, retain summary            |
-
+Every `/api/briefing` and `/api/ingest` response includes a `pipeline_trail[]` field: an ordered list of `{step, status, ms, label}` objects captured from the Agents SDK `RunHooks` lifecycle, powering the PipelineStatus UI.
 
 ### 5.2 Response schemas
 
-`**GET /api/briefing`** → returns shape from `BRIEFING_PROMPT`:
-
+**GET `/api/briefing`** (JSON):
 ```json
 {
+  "vendor": "nexacloud",
+  "contract": {
+    "value": 380000,
+    "renewal_date": "2025-12-31",
+    "days_remaining": 18,
+    "contact": "Marcus Chen"
+  },
   "tactics": [
     {
-      "name": "string — under 10 words",
+      "name": "Mention AWS",
       "confidence": 0.87,
-      "evidence": "string",
-      "timing": "string",
+      "evidence": "Worked May 2024 — 3% discount + $8k support tier upgrade",
+      "timing": "Early in the call, before pricing is anchored",
       "successes": 2,
       "total_uses": 2,
+      "last_used_date": "2024-05-14",
       "is_anti_pattern": false,
       "history": [
-        { "date": "2022-Q1", "confidence": 0.65 },
-        { "date": "2023-Q2", "confidence": 0.38 },
-        { "date": "2024-Q2", "confidence": 0.19 },
-        { "date": "2024-Q4", "confidence": 0.12 }
+        {"date": "2023-02-10", "confidence": 0.60},
+        {"date": "2023-09-03", "confidence": 0.75},
+        {"date": "2024-05-14", "confidence": 0.87}
       ]
     }
   ],
   "playbook": {
-    "opening": {
-      "move": "Reference Q3 fiscal pressure",
-      "rationale": "87% historical success — worked 2022, 2023, 2024",
-      "tactic_ref": "Fiscal Q3 pressure"
-    },
+    "opening": {"move": "...", "rationale": "...", "tactic_ref": "Mention AWS"},
     "branches": [
       {
-        "condition": "if pushback on timeline",
-        "move": "AWS benchmark pivot",
-        "rationale": "$/core comparison — won 5% discount Nov 2023, 3% + $8k support tier May 2024",
-        "tactic_ref": "AWS mention",
-        "followup": [
-          {
-            "condition": "if still resistant",
-            "move": "Hint multi-year commitment",
-            "rationale": "Untested but hot — Marcus raised unprompted Nov 18 2024",
-            "tactic_ref": "Multi-year commitment"
-          }
-        ]
-      },
-      {
-        "condition": "if counter >= 8%",
-        "move": "Accept and lock renewal cap",
-        "rationale": "Above historical average (6.2%)",
-        "tactic_ref": null
-      },
-      {
-        "condition": "if counter < 5%",
-        "move": "Silence tactic",
-        "rationale": "67% average concession follow-up",
-        "tactic_ref": null
+        "condition": "If Marcus counters with 'our pricing is already competitive'",
+        "move": "...",
+        "rationale": "...",
+        "tactic_ref": "Fiscal Q3 pressure",
+        "followup": [{"condition": "...", "move": "...", "rationale": "...", "tactic_ref": "..."}]
       }
     ]
   },
   "temporal_signals": [
-    { "signal": "string", "urgency": "high", "days_remaining": 18 }
+    {"label": "18 days to renewal", "severity": "high"},
+    {"label": "Fiscal Q3 pressure active", "severity": "medium"}
   ],
   "recent_signals": [
-    {
-      "date": "Dec 3",
-      "source": "email",
-      "summary": "string",
-      "interpretation": "string"
-    }
+    {"date": "2024-11-02", "source": "email", "summary": "Marcus mentioned roadmap Q1 2026", "interpretation": "Warming on multi-year commit"}
   ],
-  "contract": {
-    "value": "$380k",
-    "renewal_date": "Dec 31",
-    "contact": "Marcus Chen"
-  }
+  "pipeline_trail": [
+    {"step": "recall", "status": "ok", "ms": 412},
+    {"step": "synthesize", "status": "ok", "ms": 1830},
+    {"step": "rank", "status": "ok", "ms": 87}
+  ]
 }
 ```
 
-**Notes:**
-- `is_anti_pattern` defaults to `false`. When `true`, the tactic card renders with red border, "AVOID" tag, and the sparkline drawn from `history`.
-- `history` is only required on tactics with `is_anti_pattern: true`. 4–5 descending points minimum. Other tactics may omit it or return `null`.
-- `playbook` must branch at least once (opening → one conditional move). Two or three branches is ideal for demo legibility.
-- `playbook.branches[].tactic_ref` is the `name` of a tactic in `tactics[]` when the move maps to one (for score-diff highlighting after post-call log); otherwise `null`.
-
-`**POST /api/ingest**` request:
-
+**POST `/api/ingest`** request:
 ```json
 {
   "vendor": "nexacloud",
-  "notes": "string",
-  "outcome": "Successful concession|No movement|Escalated|Rescheduled",
-  "timestamp": "ISO-8601"
+  "notes": "Marcus pushed back on AWS mention. Offered 3-year commit unprompted — 8% discount + roadmap access.",
+  "outcome": "Successful concession",
+  "timestamp": "2025-12-13T16:45:00Z"
 }
 ```
+`outcome` is one of: `"Successful concession" | "No movement" | "Escalated" | "Rescheduled"`.
 
-`**POST /api/ingest**` response:
-
+**POST `/api/ingest`** response:
 ```json
 {
-  "briefing": { ...same as GET /api/briefing },
+  "briefing": { "...same shape as GET /api/briefing..." },
   "score_diffs": {
-    "AWS mention": { "old": 0.87, "new": 0.79, "delta": -0.08, "direction": "down" },
-    "Multi-year":  { "old": 0.50, "new": 0.62, "delta": +0.12, "direction": "up" }
-  }
+    "Mention AWS": {"old": 0.87, "new": 0.79, "delta": -0.08, "direction": "down"},
+    "Multi-year commitment": {"old": 0.50, "new": 0.68, "delta": 0.18, "direction": "up"}
+  },
+  "pipeline_trail": [
+    {"step": "capture_old_scores", "status": "ok", "ms": 38},
+    {"step": "retain", "status": "ok", "ms": 540},
+    {"step": "reflect", "status": "ok", "ms": 1920},
+    {"step": "diff", "status": "ok", "ms": 12}
+  ]
 }
 ```
 
 ### 5.3 Briefing prompt (exact string in `prompts.py`)
 
 ```python
-BRIEFING_PROMPT = '''
-You are a negotiation intelligence agent briefing a procurement manager before
-a vendor renewal call. Based on all stored memories for this vendor, return ONLY
-a valid JSON object with this exact structure:
-{
-  "tactics": [
-    {
-      "name": "string — tactic name, under 10 words",
-      "confidence": 0.87,
-      "evidence": "string — what the evidence says",
-      "timing": "string — when to deploy this tactic",
-      "successes": 2,
-      "total_uses": 2,
-      "is_anti_pattern": false,
-      "history": null
-    }
-  ],
-  "playbook": {
-    "opening": {
-      "move": "string — opening move, under 12 words",
-      "rationale": "string — one-sentence reason tied to evidence",
-      "tactic_ref": "string — name of matching tactic from tactics[], or null"
-    },
-    "branches": [
-      {
-        "condition": "string — 'if <counterparty response>'",
-        "move": "string — next move, under 12 words",
-        "rationale": "string — one-sentence reason tied to evidence",
-        "tactic_ref": "string or null",
-        "followup": [
-          { "condition": "string", "move": "string", "rationale": "string", "tactic_ref": "string or null" }
-        ]
-      }
-    ]
-  },
-  "temporal_signals": [
-    { "signal": "string", "urgency": "high", "days_remaining": 18 }
-  ],
-  "recent_signals": [
-    { "date": "Dec 3", "source": "email", "summary": "string", "interpretation": "string" }
-  ],
-  "contract": { "value": "$380k", "renewal_date": "Dec 31", "contact": "Marcus Chen" }
-}
+BRIEFING_PROMPT = """You are a procurement strategist. Using ONLY the provided
+Hindsight Opinions and Experiences about the vendor, produce a negotiation briefing
+as strict JSON matching this schema: { tactics[], playbook{opening, branches[]},
+temporal_signals[], recent_signals[] }.
 
-Rules for tactics:
+Rules:
 - Return at least 3 tactics sorted by confidence descending.
-- For any tactic with confidence < 0.20 AND ≥ 2 failed uses across multiple years,
-  set "is_anti_pattern": true and provide "history" as an array of 4–5
-  {date, confidence} points showing the decay over time (earliest first, most
-  recent last). Otherwise "history": null.
+- For any tactic with confidence < 0.20 AND >= 2 failed uses across multiple years,
+  set "is_anti_pattern": true and provide "history" as an array of 4-5
+  {date, confidence} points showing descending trend.
+- Always provide 2-4 "branches" in the playbook, each with a clear "condition"
+  phrased as "If <vendor_contact> says/does X".
+- At most one level of "followup" nesting per branch.
+- Every tactic MUST include: name, confidence (float 0-1), evidence (with at least
+  one dated reference), timing, successes, total_uses, last_used_date, is_anti_pattern.
+- Do not invent facts. If evidence is thin, say so in the evidence field.
+- Output valid JSON only. No prose, no markdown fences.
+"""
 
-Rules for playbook:
-- Always provide one "opening" move (highest-confidence tactic or strongest
-  temporal signal).
-- Always provide 2–4 "branches" covering the most likely counterparty responses.
-- Each branch's "tactic_ref" must match a tactic.name in tactics[] when the
-  move derives from a stored tactic; otherwise null.
-- At most one level of "followup" nesting per branch. Keep the tree legible.
-- Do not include branches for scenarios the memory has no evidence for.
-'''
+NOMEMORY_PROMPT = """You are an AI assistant giving generic negotiation advice for a
+B2B vendor renewal. You have NO information about this specific vendor, their history,
+or prior calls — only the vendor name and the buyer's role.
+
+Output strict JSON: { "tactics": [ { "name": "<under 10 words>", "advice":
+"<one-sentence textbook recommendation>" } ] }
+
+Rules:
+- Exactly 3 tactics.
+- Advice must be generic textbook content (e.g. "anchor high", "ask for multi-year discount").
+- Do NOT invent specific dates, dollar amounts, or contact names.
+- Output valid JSON only.
+"""
 ```
+
+**Wrap every `json.loads()` in a `try/except`.** If the LLM returns malformed JSON, retry once with `response_format={"type": "json_object"}` (OpenAI enforces JSON mode on gpt-4o). If it still fails, return a DEMO_MODE fixture — never 500 to the frontend.
 
 ### 5.4 Critical flow — `POST /api/ingest` (`ingest.py`)
 
-This is the demo-winning flow. Implementation must be exact:
+Wrapped by `pipeline.py` so each step emits a timing into `pipeline_trail`. The first and third steps run the full Agents SDK `BriefingAgent`; their own per-tool trails are collapsed into a single `capture_old_scores` / `reflect` parent step in the response:
 
-```python
-async def log_post_call(vendor: str, notes: str, timestamp: str):
-    # 1. Capture scores BEFORE retain()
-    old_result = client.reflect(bank_id=vendor, query=BRIEFING_PROMPT)
-    old_briefing = json.loads(old_result.content[0].text)
-    old_scores = {t['name']: t['confidence'] for t in old_briefing['tactics']}
+1. **capture_old_scores** — run the BriefingAgent once to snapshot current tactic confidences BEFORE any write.
+2. **retain** — `client.retain(bank_id=vendor, experience=notes, metadata={outcome, timestamp})`.
+3. **reflect** — run the BriefingAgent again on the updated bank; re-synthesize tactics.
+4. **diff** — compute `{old, new, delta, direction}` for every tactic where `abs(delta) >= 0.01`. Tactics below threshold are omitted from `score_diffs`.
 
-    # 2. Store the new interaction
-    client.retain(
-        bank_id=vendor,
-        content=notes,
-        context='post_call_log',
-        timestamp=timestamp,
-    )
-
-    # 3. Get updated briefing AFTER retain()
-    new_result = client.reflect(bank_id=vendor, query=BRIEFING_PROMPT)
-    new_briefing = json.loads(new_result.content[0].text)
-    new_scores = {t['name']: t['confidence'] for t in new_briefing['tactics']}
-
-    # 4. Compute diffs (threshold: change must exceed 0.01)
-    diffs = {}
-    for tactic, new_conf in new_scores.items():
-        old_conf = old_scores.get(tactic)
-        if old_conf is not None and abs(new_conf - old_conf) > 0.01:
-            diffs[tactic] = {
-                'old': round(old_conf, 2),
-                'new': round(new_conf, 2),
-                'delta': round(new_conf - old_conf, 2),
-                'direction': 'up' if new_conf > old_conf else 'down',
-            }
-    return {'briefing': new_briefing, 'score_diffs': diffs}
-```
+Return `{briefing, score_diffs, pipeline_trail}`.
 
 ---
 
 ## 6. Frontend screens
 
-### 6.1 Dashboard (`/`)
+### 6.1 Dashboard (`/` → `app/page.tsx`)
 
-- Header: "Leverage — your vendor memory"
-- Grid of 3 vendor cards. Per card:
-  - Vendor name
-  - Annual contract value (`$380k` / `$120k` / `$85k`)
-  - Renewal date + days remaining — **red background if <30 days**
-  - "N interactions logged"
-  - "M tactics tracked"
-  - Button: **Generate briefing** → `/briefing/:vendor`
+- Header: "LEVERAGE" wordmark, tagline "Negotiation memory for procurement".
+- Grid of 3 `VendorCard` components:
+  - Vendor name, annual contract value, renewal date, days remaining, M tactics tracked, interaction count.
+  - **Red temporal badge** when `days_remaining < 30` (NexaCloud: `"18 days · fiscal Q3 pressure"`).
+  - Click → `/briefing/[vendor]`.
+- Empty state: if `/api/vendors` returns empty, show "Seed the Hindsight banks before demo — see README §7."
 
-### 6.2 Briefing (`/briefing/:vendor`) — the money shot
+### 6.2 Briefing (`/briefing/[vendor]` → `app/briefing/[vendor]/page.tsx`) — the money shot
 
-- **Header bar**
-  - Left: "Pre-call briefing · Leverage" + vendor name ("NexaCloud — annual renewal")
-  - Right: red countdown box "Call in 4h 32m"
-  - Far right: **Memory toggle** (see §6.4) — always visible in header so the A/B contrast is one click away during demo
-- **Stats row (3 cards)**: Annual value · Renewal date · Interactions logged
-- **Playbook panel** (section label: "Your play — generated from memory") — RENDERED ABOVE TACTIC CARDS, this is the demo's centre of gravity
-  - Component: `Playbook.jsx`
-  - Opening move at top, bold, large type. Rationale as subdued caption below.
-  - Branches rendered as an indented decision tree using Unicode box-drawing or styled borders:
-    ```
-    OPENING  Reference Q3 fiscal pressure
-             └ 87% historical success — worked 2022, 2023, 2024
+Layout (top to bottom):
+1. **Temporal banner** — contract value, renewal date, days remaining, contact name.
+2. **MemoryToggle** — the hero. Single switch, bold label. Default ON.
+3. **PipelineStatus trail** — three lines with checkmarks and measured ms, rendered during load and after toggle flip.
+4. **TacticCard grid** — 4 cards, sorted by confidence desc. Each card:
+   - Name, 5-dot confidence rating, color (green ≥0.7, amber 0.4–0.7, grey <0.4, **red border + "AVOID" tag** if `is_anti_pattern`).
+   - Evidence line, timing line, track record (`2 for 2`, `0 for 3`).
+5. **Playbook** — branching decision tree (inline SVG or nested flex). Opening move at top, 2–4 branches below, each with one optional followup.
+6. **AntiPatternSparkline** — descending red line, pinned at the bottom with "AVOID" tag.
+7. **SignalFeed** — 2 most recent signals (date, source, summary, italic interpretation).
+8. **"Log post-call notes" button** → opens `PostCallForm` (modal).
 
-    ├ if pushback on timeline
-    │   → AWS benchmark pivot
-    │     └ Won 5% Nov 2023, 3% + $8k support May 2024
-    │   └ if still resistant
-    │       → Hint multi-year commitment
-    │         └ Untested but hot — Marcus raised unprompted Nov 18
+### 6.3 Post-call logger (modal, triggered from briefing)
 
-    ├ if counter ≥ 8%
-    │   → Accept and lock renewal cap
+Form fields:
+- Date (defaults to now)
+- Outcome dropdown (§5.2 enum)
+- Notes (textarea, required, ≥20 chars)
+- Submit button
 
-    └ if counter < 5%
-        → Silence tactic  (67% avg concession follow-up)
-    ```
-  - Each move that has a non-null `tactic_ref` is click-highlightable and visually linked to the matching tactic card below.
-  - After post-call log submit, playbook re-renders with a brief cross-fade. Any move whose underlying tactic changed confidence gets a green/red flash border.
-- **Tactic cards** (section label: "Tactics in memory")
-  - Sorted descending by confidence, BUT anti-pattern cards always pinned to the bottom under their own subheader "Anti-patterns — do not use"
-  - Each card: name (bold), 5-dot rating, numeric score
-  - Dot colours:
-    - **Green** if `confidence > 0.75`
-    - **Amber** if `0.50 ≤ confidence ≤ 0.75`
-    - **Grey** if `confidence < 0.50`
-  - Below: evidence paragraph, evidence tags, timing recommendation
-  - **Anti-pattern variant** — when `is_anti_pattern: true`:
-    - Red border around the card
-    - "AVOID" pill (red background, white text) next to name
-    - Small sparkline component (`AntiPatternSparkline.jsx`, ~120×30px, Recharts `LineChart` or inline SVG) plotting `history` points — descending line, red stroke
-    - Caption under sparkline: "Confidence falling since {first history date}"
-- **Temporal banner** (red background): "Fiscal year pressure window: 18 days remaining" + one explanatory sentence
-- **Recent signals feed**: last 3–5 from `recall()`. Each: date, source (email/call), summary, italic interpretation
-- **Footer**: memory status line + button "Log post-call notes" → post-call form
-
-### 6.3 Post-call logger (modal or `/briefing/:vendor/log`)
-
-- Header: "Log post-call notes — {vendor}"
-- Date field (pre-populated with today)
-- Outcome dropdown: Successful concession / No movement / Escalated / Rescheduled
-- Notes textarea with placeholder: "What happened? What did you say? What did they say?"
-- Button: **Save to memory and update tactics**
-- On submit:
-  1. `POST /api/ingest`
-  2. Show `ScoreDiff` panel — animated lines like `AWS mention: 0.87 → 0.91 (+0.04)` in green (or red for decreases)
-  3. Pause ~2s for judges to read
-  4. Auto-navigate back to briefing — new playbook cross-fades in; moves tied to changed tactics flash green/red for ~800ms; new tactic scores already reflected in dot colours
+On submit:
+- POST `/api/ingest` with PipelineStatus spinner overlay.
+- On response: show `ScoreDiff` panel for ~2s (old → new, colored arrow, animate opacity).
+- Auto-close modal, briefing playbook cross-fades and flashes changed moves green/red for 800ms.
 
 ### 6.4 Before/after memory toggle
 
-- Switch on briefing screen header (always visible — see §6.2)
-- Label: "Memory: ON" / "Memory: OFF". Animated thumb slider.
-- OFF → calls `POST /api/briefing/nomemory` (Groq with just the vendor name and role, no Hindsight context) — renders a deliberately generic briefing: vague openers ("Build rapport"), no named tactics, no dates, no dollar deltas, empty playbook placeholder ("Memory required for play generation")
-- ON → `GET /api/briefing` — full Hindsight briefing with playbook, tactics, evidence, anti-patterns
-- Default state on first visit: ON. Demo opens by flipping it OFF, then ON.
-- Transition: 250ms cross-fade. No full page reload.
+- **OFF** → call `POST /api/briefing/nomemory` (OpenAI with vendor name + role only, no Hindsight context). UI shows 3 generic advice bullets, greyed playbook placeholder (`"— no playbook without memory —"`), no anti-pattern, no signals.
+- **ON** → `GET /api/briefing` — full Hindsight + Agents-SDK briefing with playbook, tactics, evidence, anti-patterns, signals.
+- Toggle flip triggers a 300ms cross-fade; PipelineStatus re-renders fresh timings on each flip.
 
-### 6.5 Confidence evolution chart (P1)
+### 6.5 PipelineStatus (Agents-SDK orchestration trail)
 
-- Recharts `LineChart`
-- X: interaction dates (seeded + live)
-- Y: confidence 0.0 – 1.0
-- One colour-coded line per tactic
-- Click point → show what interaction caused the score change
+Renders as a 3-line pill on briefing load and as a 4-line pill on ingest. Each line: `✓ <step> <label> — <ms> ms` in a monospace font. Example during briefing:
+```
+✓ recall    Recalled 23 memories from Hindsight — 412 ms
+✓ synthesize  Synthesized 4 tactics via OpenAI — 1830 ms
+✓ rank    Ranked by confidence — 87 ms
+```
+Backend captures real latency per step via `RunHooks.on_tool_start` / `on_tool_end` from the Agents SDK (millisecond-accurate); for ingest it adds outer `time.perf_counter()` timers around `retain` and `diff` since those aren't agent tools. Everything returns in `pipeline_trail[]`. If the Agents SDK integration isn't wired by hour 8, fall back to fake labels with `setTimeout` on the frontend and **drop the ms footers** — never invent fake timings.
+
+### 6.6 Confidence evolution chart (P1)
+
+Recharts `LineChart` rendering `tactic.history[]`, one line per tactic, shown in a collapsed drawer under the TacticCard grid.
 
 ---
 
@@ -479,96 +395,134 @@ async def log_post_call(vendor: str, notes: str, timestamp: str):
 
 ### 7.1 Contract
 
-```bash
-python seeder/seed_vendors.py
-```
-
-- Reads `NEXACLOUD_INTERACTIONS`, `DATAPIPE_INTERACTIONS`, `SECURENET_INTERACTIONS` from `vendor_data.py`
-- Each interaction: `{ content: str, context: str, timestamp: ISO-8601 }`
-- Calls `client.retain(bank_id, content, context, timestamp)` for every record
-- Prints progress per vendor and a final success line
+`seeder/seed_vendors.py` reads `vendor_data.py` (a pure-Python dict of 30 interactions) and calls `client.retain()` once per interaction into the correct bank.
 
 ### 7.2 Data realism requirements
 
-- Real-sounding names, dollar amounts, dates, outcomes. Use Faker for filler only.
-- Timestamps must span ~6 months leading up to demo date
-- Every embedded pattern above (section 4.3) must appear in at least as many interactions as its `total_uses` implies
-- Failed tactics must be present — Hindsight needs negative examples to produce low-confidence Opinions
+- Dates span 2022–2025, with most recent within the last 90 days.
+- NexaCloud interactions must support all 4 on-screen tactics (AWS mention, Q3 pressure, multi-year, cancellation-threat anti-pattern) with at least 2 dated evidence points each.
+- Contact names consistent across interactions (Marcus Chen for NexaCloud, etc.).
+- Use Faker for filler text but **hand-author the critical turning-point interactions** — LLMs notice generic Faker prose and the tactics will look weak.
 
 ### 7.3 Run timing
 
-**Run the seeder ≥24 hours before the demo.** Hindsight needs time for Observations synthesis to stabilise. Empty memory banks are disqualifying.
+**Run the seeder at hour -3 (pre-hackathon prep), and again the night before if possible.** Hindsight needs time for Observations synthesis to stabilise — official line is 24h, actual latency is unverified. If synthesis is still warming at hour 5 of the sprint, `reflect()` may return thin Opinions — acceptable, `BRIEFING_PROMPT` will still produce tactics from raw Experiences.
+
+Empty memory banks are disqualifying. Seed early, seed redundantly.
 
 ---
 
-## 8. Build order (recommended sequence)
+## 8. Build plan (10-hour sprint)
 
-1. Repo scaffold, `.env.example`, `requirements.txt`, `package.json`
-2. Hindsight Cloud account, apply `MEMHACK409`, confirm keys work with a trivial `retain()` call
-3. `vendor_data.py` — write the 53 interactions (longest single task — budget 2–3 hours)
-4. `seed_vendors.py` — run it, verify banks populate
-5. `backend/main.py` + `briefing.py` — implement `GET /api/briefing` with hardcoded `BRIEFING_PROMPT` (include playbook + anti-pattern fields). Test via curl.
-6. `briefing.py` — add `POST /api/briefing/nomemory` route (Groq-only, deliberately generic output — no Hindsight calls). Test via curl.
-7. Frontend Vite + Tailwind scaffold, API client, routing
-8. `Dashboard.jsx` → `Briefing.jsx` skeleton with `TacticCard`, `TemporalBanner`, `SignalFeed` (static styling first, wire API second)
-9. `Playbook.jsx` — render branching decision tree from `playbook` field. Static mock first, then wire.
-10. `AntiPatternSparkline.jsx` — Recharts `LineChart` or inline SVG from `history` array. Anti-pattern card variant styling.
-11. `MemoryToggle.jsx` — header switch that swaps between `/api/briefing` and `/api/briefing/nomemory`
-12. `ingest.py` — implement the exact 4-step flow in §5.4
-13. `PostCallForm.jsx` + `ScoreDiff.jsx` — animated diffs + playbook re-render cross-fade
-14. **Smoke-test the full loop 5× end-to-end** — OFF → ON → log → redraw
-15. Deploy: Railway (backend) + Vercel (frontend). Update `VITE_API_URL`.
-16. Only now touch P1 features
-17. Record demo video, write article, push final README
+### 8.1 Pre-hackathon prep (hour -3 to 0 — outside the sprint budget)
 
----
+| Pre-hour     | Work                                                                                          |
+|--------------|-----------------------------------------------------------------------------------------------|
+| -3.0 to -2.0 | Hindsight Cloud signup + `MEMHACK409` promo. Verify API key with trivial `retain()` + `reflect()` round-trip. Save response shape to a local file. |
+| -2.5 to -2.0 | `pip install openai-agents`. Skim the Agents SDK quickstart. Verify a trivial `Agent` + `Runner.run_streamed()` round-trip emits `tool_call_item` events. |
+| -2.0 to -1.0 | Repo on GitHub. Next.js 15 App Router + Tailwind v3.4 scaffold (`npx create-next-app@latest --ts --tailwind --app`). Python 3.11 FastAPI scaffold + `/health` route. Pinned `requirements.txt` and `package.json`. `.env.example`. |
+| -1.0 to 0.0  | Deploy smoke. Push scaffolds to Vercel + Railway. Verify `/health` returns 200 from the Railway URL. Verify Next.js renders on Vercel. Verify CORS allows the Vercel origin. |
+| The night before | Run `seed_vendors.py` against the three Hindsight banks. Leave overnight for synthesis. |
 
-## 9. Acceptance criteria (done = all of these pass)
+### 8.2 10-hour sprint build order (with pre-committed cut rules)
 
-- `python seeder/seed_vendors.py` completes with no errors and populates 3 banks
-- `GET /api/vendors` returns 3 vendors with correct stats
-- `GET /api/briefing?vendor=nexacloud` returns parseable JSON matching the schema in §5.2, with ≥3 tactics sorted by confidence descending, top tactic confidence ≥ 0.80
-- `POST /api/briefing/nomemory?vendor=nexacloud` returns generic Groq output with empty/placeholder playbook and no named tactics, evidence, or dates
-- Dashboard renders 3 vendor cards; NexaCloud card shows red "days remaining" badge
-- Briefing screen renders within 2 seconds of vendor click
-- Tactic cards show correct dot colours per thresholds in §6.2
-- At least one tactic in the NexaCloud briefing has `is_anti_pattern: true` and renders with red border, "AVOID" tag, and a descending sparkline
-- Playbook panel renders an opening move + at least 2 branches; moves are visually linked (click-highlight) to their `tactic_ref` cards
-- Memory toggle is visible in the briefing header; flipping OFF shows a visibly inferior briefing within 2 seconds; flipping ON restores the full briefing. Transition cross-fades, does not full-reload.
-- Temporal banner visible with days-remaining number
-- Recent signals feed shows ≥3 entries with dates, sources, and italic interpretations
-- Post-call form submission triggers the full §5.4 flow
-- Score diffs visibly animate old→new with green/red colour coding within 3 seconds of submit
-- Playbook visibly redraws after the score diff; moves tied to changed tactics flash green/red briefly
-- At least one tactic's confidence changes (direction + magnitude) per post-call log
-- Full demo script (§10 in source doc) runs in ≤5 minutes with no dead time
-- Repo is public, README renders, `.env.example` present, no secrets committed
+| Hour     | Work                                                                 | Cut rule if behind                              |
+|----------|----------------------------------------------------------------------|-------------------------------------------------|
+| 0.0–2.5  | `seeder/vendor_data.py` (30 interactions, 23+4+3). `seed_vendors.py` batch writer. Run against live Hindsight banks; verify `reflect()` returns meaningful Opinions. | At 2.0: drop to 20 interactions (17+2+1). At 2.5: **STOP and commit what you have**. |
+| 2.5–4.0  | Backend core: `main.py` + routes, `prompts.py`, `briefing.py` (with `BRIEFING_PROMPT` + OpenAI JSON-mode call), `nomemory.py` (OpenAI with `NOMEMORY_PROMPT`). Curl-test both. | At 4.0: if `reflect()` returns invalid JSON, wrap in try/except, retry with OpenAI JSON mode, fall through to DEMO_MODE fixture. |
+| 4.0–5.0  | `ingest.py` (§5.4 four-step flow) reusing `pipeline.run_briefing`. Add `retain` + `diff` step timers. Curl-test a sample note; confirm `score_diffs` appear and `pipeline_trail` has 4 steps. | At 5.0: if ingest is flaky, stub `/api/ingest` with canned diffs from `fixtures/demo.json` (DEMO_MODE). |
+| 5.0–6.0  | Frontend wiring: `lib/api.ts` typed client, `lib/types.ts`, `VendorCard.tsx`, Dashboard page routing, red badge + inline temporal line on NexaCloud. | At 6.0: ship minimal Tailwind if unstyled — function over polish. |
+| 6.0–8.0  | **Briefing page hero**: `TacticCard`, `Playbook`, `AntiPatternSparkline`, `MemoryToggle`, `PipelineStatus` (~60 min), `SignalFeed` (2 items). Wire toggle to both endpoints. | At 7.5: if toggle is flaky, ship diff-as-hero and cut toggle. At 8.0: if `PipelineStatus` unwired, fake step labels with `setTimeout`, **drop ms footers**. |
+| 8.0–8.5  | `PostCallForm` + `ScoreDiff` with CSS transitions + arrows. Wire to `/api/ingest`. Trigger briefing re-render on diff response. | At 8.5: show plain "saved" confirmation if diffs don't render. |
+| 8.5–9.0  | **Record backup demo video** with OBS/Loom. Upload to GitHub Releases. Take 4 screenshots for the README. Verify the deployed app still works end-to-end. Re-check CORS. Write the Priya hero + $1.1M framing in the README. | — |
+| 9.0–9.5  | Smoke-test end-to-end 3× against the **live deployment** (not localhost). Dashboard → briefing → toggle OFF → toggle ON → post-call log → diffs. | — |
+| 9.5–10.0 | Rehearse demo 2× following the §9 script. README polish (5 min). Hackathon submission form (5 min). **Submit with 10 min to spare.** | At 9.75: if anything is broken live, swap to backup video, submit without debugging. |
+
+**Post-submission (outside the 10-hr budget):** 400–600 word write-up + LinkedIn post (~60 min).
 
 ---
 
-## 10. Risks and mitigations
+## 9. Demo script (5 minutes, 6 beats)
 
+**Beat 1 — Cold open (0:00–0:30).**
+> "This is Priya. She runs procurement at a 400-person SaaS company. Tomorrow at 10 AM she's on a call to renew NexaCloud — $380,000 annual contract, 18 days to renewal. She's done this dance 47 times this year. Every time, she walks in blind."
 
-| Risk                                            | Mitigation                                                                                                                                                             |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `reflect()` returns non-JSON or invalid JSON    | Wrap `json.loads()` in try/except; on failure, call Groq directly with the same prompt as fallback; log the raw response for debugging                                 |
-| Confidence scores don't change after `retain()` | Seed stronger contradictory signal in the demo post-call note (like the §10 Beat 5 canned text — "Rep pushed back harder than before + offered multi-year unprompted") |
-| Hindsight API latency blows through 2s budget   | Pre-fetch briefing on dashboard hover; show skeleton loader; cache last briefing client-side                                                                           |
-| Empty memory bank at demo time                  | Re-run seeder ≥24h before; keep a backup seeded account                                                                                                                |
-| Live demo fails on stage                        | Have the recorded video ready to play immediately; switch without apologising                                                                                          |
+**Beat 2 — Dashboard (0:30–1:00).**
+Open `/`. Three vendor cards. Red badge on NexaCloud: `"18 days · fiscal Q3 pressure"`. Click in.
 
+**Beat 3 — The toggle, the hero (1:00–2:30).**
+> "Here's her briefing. Memory OFF first — this is what ChatGPT gives her."
+Toggle OFF. Generic 3-bullet advice. "Anchor high." "Ask for multi-year."
+> "Now watch."
+Flip ON. PipelineStatus flashes: `✓ recall 412ms ✓ synthesize 1830ms ✓ rank 87ms`. Four tactics render:
+- **Mention AWS** — 0.87 confidence, 2/2 success, last worked May 2024, 3% discount + $8k support
+- **Fiscal Q3 pressure** — 0.74, 3/4 success
+- **Multi-year commitment** — 0.50, raised unprompted Nov 2024
+- **Cancellation threat** — 0.12, AVOID (red border, descending sparkline)
+
+**Beat 4 — Post-call log (2:30–3:30).**
+Click "Log post-call notes." Type:
+> "Marcus pushed back harder than expected when I mentioned AWS. Offered a 3-year commitment unprompted — 8% discount plus roadmap access."
+Submit. PipelineStatus flashes again. ScoreDiff: `Mention AWS 0.87 → 0.79 ▼`, `Multi-year commitment 0.50 → 0.68 ▲`. Playbook cross-fades; the "open with AWS mention" move flashes red, the "pivot to multi-year" move flashes green.
+
+**Beat 5 — The dollar number (3:30–4:30).**
+> "Priya just saved $23,400 on this one call. Across her 47 vendors, that's $1.1 million a year. But the real win — her memory compounds. Next year the AWS tactic has a 3rd data point. Five years from now, LEVERAGE knows Marcus better than Marcus knows himself."
+
+**Beat 6 — Company frame (4:30–5:00).**
+> "Procurement is the wedge. Sales close, legal settlements, M&A term sheets, hiring packages, partnership deals — every repeated B2B negotiation has the same memory problem. LEVERAGE is the memory layer. Powered by Hindsight. Orchestrated by the OpenAI Agents SDK."
 
 ---
 
-## 11. Deliverables checklist
+## 10. Acceptance criteria (done = all of these pass)
 
-- Public GitHub repo with clean commit history
-- README explains product, run instructions, architecture, and Hindsight network usage
-- `.env.example` present, no real keys in repo
-- `requirements.txt` and `package.json` accurate
-- Demo video ≤5 minutes — opens with Priya story, shows score update, ends with $23,400 number
-- Article 400–600 words
-- LinkedIn post drafted
-- Seeder run ≥24h before demo
-- Post-call → score-update flow rehearsed ≥5 times end-to-end
+- [ ] `/api/vendors` returns exactly 3 vendors
+- [ ] `GET /api/briefing?vendor=nexacloud` returns ≥4 tactics, at least one with `is_anti_pattern: true`, and a non-empty `pipeline_trail` with measured ms
+- [ ] `POST /api/briefing/nomemory` returns exactly 3 generic tactics with no dates or dollar amounts
+- [ ] `POST /api/ingest` returns a `score_diffs` map with at least 2 entries after the canonical Priya note
+- [ ] MemoryToggle flips cleanly OFF ↔ ON with a visible 300ms cross-fade
+- [ ] PipelineStatus trail renders on both briefing load and ingest, showing 3 and 4 visible steps respectively
+- [ ] AntiPatternSparkline renders a descending red line with "AVOID" tag
+- [ ] ScoreDiff shows `old → new` with green-up / red-down arrows and a visible CSS transition
+- [ ] Frontend deployed on Vercel, backend deployed on Railway, both reachable via public URL
+- [ ] Backup demo video uploaded to a GitHub Release as a fallback
+- [ ] Full demo script (§9) runs live in under 5 minutes without errors
 
+---
+
+## 11. Risks and mitigations
+
+| Risk | Mitigation |
+|------|------------|
+| Hindsight Observations haven't synthesized in time | Seed at hour -3 AND the night before. `BRIEFING_PROMPT` works on raw Experiences if Opinions are thin. |
+| `reflect()` returns malformed JSON | Wrap in try/except, retry with OpenAI `response_format={"type":"json_object"}`, fall through to DEMO_MODE fixture. |
+| Agents SDK hook/event API differs from expectations | Build the PipelineStatus UI first (trusts only the trail shape, not the source). Fall back to outer `time.perf_counter()` timers in `pipeline.py`; drop ms footers if timings aren't real. |
+| OpenAI rate limit / key missing `gpt-4o` | Override `OPENAI_MODEL=gpt-4o-mini` via env. Both prompts are short enough to fit. |
+| Railway cold-start kills demo | Hit `/health` 60s before the demo; keep a curl loop warm during rehearsal. |
+| Live demo fails on stage | Backup video recorded at hour 8.5, uploaded to GitHub Release. Swap at hour 9.75 without debugging. |
+| CORS breaks in prod | `CORS_ORIGINS` env var explicitly includes the Vercel origin. Smoke-test from the deployed frontend, never localhost. |
+| Post-call diff animation doesn't fire | Ship plain "saved" confirmation as fallback; keep the playbook cross-fade as the visual cue instead. |
+
+---
+
+## 12. Deliverables checklist
+
+- [ ] Public GitHub repo with MIT LICENSE and clean README
+- [ ] Frontend deployed to Vercel (custom domain optional)
+- [ ] Backend deployed to Railway with `/health` green
+- [ ] 3 Hindsight banks seeded (NexaCloud 23, DataPipe 4, SecureNet 3)
+- [ ] OpenAI Agents SDK orchestration (BriefingAgent + tools + RunHooks) wrapping briefing + ingest, visibly surfaced in the UI
+- [ ] README includes: hero screenshot, Priya story, §9 demo script, $23,400 / $1.1M framing, setup instructions
+- [ ] Backup demo video as a GitHub Release asset
+- [ ] Hackathon submission form completed with 10 min to spare
+- [ ] Post-submission: 400–600 word article + LinkedIn post
+
+---
+
+## 13. Open questions (flag before pre-hackathon prep ends)
+
+- **Agents SDK quirks:** any edge cases around `Runner.run_streamed()` with JSON-schema response formats on `gpt-4o`? Any issues emitting `tool_call_output_item` for tools that return large JSON strings? Verify during pre-flight.
+- **Hindsight synthesis latency:** 24h official vs actual. If possible, seed a throwaway trial bank 24h before prep begins and measure Opinions quality at T+1h, T+6h, T+24h.
+- **OpenAI model access:** does the user's key have `gpt-4o`, `gpt-4o-mini`, or both? Pin via `OPENAI_MODEL` env var.
+- **Demo venue:** stage or video call? Determines whether we care about projector aspect ratio (target 1366×768 through 1920×1080).
+
+Resolve all four during the pre-hackathon prep window (hour -3 to 0). Do not resolve them during the sprint.
