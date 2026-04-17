@@ -117,7 +117,50 @@ async def run_briefing(bank_id: str, vendor_meta: dict) -> tuple[dict, List[Pipe
     )
     result = await Runner.run(BRIEFING_AGENT, input=user_input, hooks=hooks)
     raw = json.loads(result.final_output)
+    # Agent sometimes wraps output: {"briefing": {...}} — unwrap if needed
+    if "briefing" in raw and "tactics" not in raw:
+        raw = raw["briefing"]
     return raw, hooks.steps
+
+
+def _norm_playbook(pb) -> dict:
+    """Coerce LLM playbook output into the expected schema."""
+    if not isinstance(pb, dict):
+        pb = {"opening": {"move": str(pb), "rationale": "", "tactic_ref": ""}, "branches": []}
+
+    opening = pb.get("opening", {})
+    if isinstance(opening, str):
+        opening = {"move": opening, "rationale": "", "tactic_ref": ""}
+    opening.setdefault("rationale", "")
+    opening.setdefault("tactic_ref", "")
+
+    branches = []
+    for b in pb.get("branches", []):
+        if isinstance(b, str):
+            b = {"condition": b, "move": b, "rationale": "", "tactic_ref": "", "followup": None}
+        b.setdefault("move", b.get("condition", ""))
+        b.setdefault("rationale", "")
+        b.setdefault("tactic_ref", "")
+        followup = b.get("followup")
+        if isinstance(followup, str) or followup is None:
+            b["followup"] = None
+        branches.append(b)
+
+    return {"opening": opening, "branches": branches}
+
+
+def _norm_signals(items: list, kind: str) -> list:
+    """Coerce string signals into proper dicts."""
+    out = []
+    for item in items:
+        if isinstance(item, str):
+            if kind == "temporal":
+                out.append({"label": item, "severity": "medium"})
+            else:
+                out.append({"date": "", "source": "unknown", "summary": item, "interpretation": ""})
+        else:
+            out.append(item)
+    return out
 
 
 def extract_briefing(raw: dict, vendor_meta: dict, bank_id: str, trail: List[PipelineStep]):
@@ -132,8 +175,8 @@ def extract_briefing(raw: dict, vendor_meta: dict, bank_id: str, trail: List[Pip
             "contact": vendor_meta["contact"],
         },
         tactics=raw.get("tactics", []),
-        playbook=raw["playbook"],
-        temporal_signals=raw.get("temporal_signals", []),
-        recent_signals=raw.get("recent_signals", []),
+        playbook=_norm_playbook(raw.get("playbook", {})),
+        temporal_signals=_norm_signals(raw.get("temporal_signals", []), "temporal"),
+        recent_signals=_norm_signals(raw.get("recent_signals", []), "recent"),
         pipeline_trail=[s.model_dump() for s in trail],
     )
