@@ -100,3 +100,90 @@ class NoMemoryTactic(BaseModel):
 class NoMemoryResponse(BaseModel):
     vendor: str
     tactics: List[NoMemoryTactic]
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str = Field(..., min_length=8)
+    full_name: str = ""
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user_id: str
+    email: str
+
+
+class UserProfile(BaseModel):
+    id: str
+    email: str
+    full_name: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Calls
+# ---------------------------------------------------------------------------
+
+class CoachingEvent(BaseModel):
+    turn: int
+    suggestions: List[str]
+    warnings: List[str]
+    correction: Optional[str] = None
+    current_tactic: Optional[str] = None
+
+
+class KeyMoment(BaseModel):
+    turn_index: int
+    moment: str
+    type: Literal["good", "missed", "correction"]
+
+
+class SaveCallRequest(BaseModel):
+    vendor: str
+    started_at: str
+    ended_at: str
+    duration_secs: int
+    transcript: List[str]
+    coaching_shown: List[dict]
+    outcome: Optional[Literal["won", "lost", "pending", "escalated"]] = None
+    briefing_context: str = ""
+
+
+class CallRecord(BaseModel):
+    id: str
+    vendor: str
+    started_at: Optional[str] = None
+    ended_at: Optional[str] = None
+    duration_secs: Optional[int] = None
+    transcript: Optional[List[str]] = None
+    coaching_shown: Optional[List[dict]] = None
+    outcome: Optional[str] = None
+    narrative: Optional[str] = None
+    adherence_score: Optional[float] = None
+    tactics_used: Optional[List[str]] = None
+    key_moments: Optional[List[dict]] = None
+    created_at: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Gmail
+# ---------------------------------------------------------------------------
+
+class GmailEmail(BaseModel):
+    id: str
+    subject: str
+    from_: str = Field(alias="from")
+    date: str
+    snippet: str
+
+    class Config:
+        populate_by_name = True

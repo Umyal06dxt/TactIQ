@@ -77,3 +77,41 @@ export type IngestRequest = {
   outcome: "Successful concession" | "No movement" | "Escalated" | "Rescheduled";
   timestamp: string;
 };
+
+export type CoachingEvent = {
+  turn: number;
+  suggestions: string[];
+  warnings: string[];
+  correction: string | null;
+  current_tactic: string | null;
+};
+
+export type KeyMoment = {
+  turn_index: number;
+  moment: string;
+  type: "good" | "missed" | "correction";
+};
+
+export type CallRecord = {
+  id: string;
+  vendor: string;
+  started_at: string | null;
+  ended_at: string | null;
+  duration_secs: number | null;
+  transcript: string[] | null;
+  coaching_shown: CoachingEvent[] | null;
+  outcome: "won" | "lost" | "pending" | "escalated" | null;
+  narrative: string | null;
+  adherence_score: number | null;
+  tactics_used: string[] | null;
+  key_moments: KeyMoment[] | null;
+  created_at: string | null;
+};
+
+export type EmailThread = {
+  id: string;
+  subject: string;
+  from: string;
+  date: string;
+  snippet: string;
+};

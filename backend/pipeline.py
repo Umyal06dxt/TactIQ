@@ -2,8 +2,9 @@
 from __future__ import annotations
 import json
 import os
+import re
 import time
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from agents import Agent, Runner, RunHooks, function_tool
 from openai import OpenAI
@@ -131,11 +132,40 @@ async def run_briefing(bank_id: str, vendor_meta: dict) -> tuple[dict, List[Pipe
     if not output_str:
         raise RuntimeError(f"BriefingAgent returned no output for {bank_id}")
 
-    raw = json.loads(output_str)
+    raw = _parse_json(output_str, bank_id)
     # Agent sometimes wraps output: {"briefing": {...}} — unwrap if needed
     if "briefing" in raw and "tactics" not in raw:
         raw = raw["briefing"]
     return raw, hooks.steps
+
+
+def _parse_json(text: str, context: str = "") -> dict:
+    """Extract JSON from agent output robustly: strip BOM, fences, then regex-fallback."""
+    # Strip BOM and whitespace
+    text = text.lstrip("\ufeff").strip()
+
+    # Strip markdown code fences
+    if text.startswith("```"):
+        lines = text.splitlines()
+        inner = lines[1:-1] if lines and lines[-1].strip() == "```" else lines[1:]
+        text = "\n".join(inner).strip()
+
+    # Direct parse
+    if text:
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+    # Regex: find the outermost {...} block
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            pass
+
+    raise RuntimeError(f"Could not parse JSON from agent output for {context}: {text[:200]!r}")
 
 
 def _norm_playbook(pb) -> dict:
@@ -158,7 +188,24 @@ def _norm_playbook(pb) -> dict:
         b.setdefault("rationale", "")
         b.setdefault("tactic_ref", "")
         followup = b.get("followup")
-        if isinstance(followup, str) or followup is None:
+        if isinstance(followup, dict):
+            followup = [followup]
+        if not isinstance(followup, list):
+            followup = None
+        if followup:
+            normed = []
+            for f in followup:
+                if isinstance(f, str):
+                    f = {"condition": f, "move": f, "rationale": "", "tactic_ref": ""}
+                elif isinstance(f, dict):
+                    action = f.get("action", "")
+                    f.setdefault("condition", f.get("condition", action))
+                    f.setdefault("move", f.get("move", action))
+                    f.setdefault("rationale", f.get("rationale", ""))
+                    f.setdefault("tactic_ref", f.get("tactic_ref", ""))
+                normed.append(f)
+            b["followup"] = normed
+        else:
             b["followup"] = None
         branches.append(b)
 
