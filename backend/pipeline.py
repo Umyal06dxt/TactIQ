@@ -33,8 +33,11 @@ def recall_memories(bank_id: str) -> str:
         JSON string of the recalled memory payload.
     """
     assert _hindsight is not None, "pipeline.set_hindsight_client() was never called"
-    opinions = _hindsight.reflect(bank_id=bank_id)
-    return json.dumps(opinions, default=str)
+    response = _hindsight.reflect(
+        bank_id=bank_id,
+        query="negotiation tactics, concessions, outcomes, strategies, patterns, anti-patterns",
+    )
+    return json.dumps(response.model_dump(), default=str)
 
 
 @function_tool

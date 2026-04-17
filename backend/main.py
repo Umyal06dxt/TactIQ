@@ -24,8 +24,8 @@ app.add_middleware(
 )
 
 try:
-    from hindsight_client import HindsightClient
-    _hindsight = HindsightClient(
+    from hindsight_client import Hindsight
+    _hindsight = Hindsight(
         api_key=os.environ.get("HINDSIGHT_API_KEY", ""),
         base_url=os.environ.get("HINDSIGHT_API_URL", "https://api.hindsight.vectorize.io"),
     )

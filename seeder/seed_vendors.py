@@ -17,27 +17,28 @@ def main():
         sys.exit(1)
 
     try:
-        from hindsight_client import HindsightClient
+        from hindsight_client import Hindsight
+
     except ImportError:
         print("ERROR: hindsight-client not installed. Run: pip install hindsight-client", file=sys.stderr)
         sys.exit(1)
 
     from vendor_data import VENDORS
 
-    client = HindsightClient(api_key=api_key, base_url=base_url)
+    client = Hindsight(api_key=api_key, base_url=base_url)
 
     total = 0
     for bank_id, v in VENDORS.items():
         print(f"\n=== Seeding {v['name']} ({bank_id}) — {len(v['interactions'])} interactions ===")
         client.retain(
             bank_id=bank_id,
-            experience=f"Vendor {v['name']}. Annual contract value ${v['annual_value']:,}. Renewal date {v['renewal_date']}. Primary contact {v['contact']}.",
+            content=f"Vendor {v['name']}. Annual contract value ${v['annual_value']:,}. Renewal date {v['renewal_date']}. Primary contact {v['contact']}.",
             metadata={"type": "world_fact"},
         )
         for i, interaction in enumerate(v["interactions"], 1):
             client.retain(
                 bank_id=bank_id,
-                experience=interaction["summary"],
+                content=interaction["summary"],
                 metadata={
                     "type": interaction["type"],
                     "date": interaction["date"],

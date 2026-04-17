@@ -42,7 +42,7 @@ async def run_ingest(req: IngestRequest, vendor_meta: dict, hindsight_client) ->
     t0 = time.perf_counter()
     hindsight_client.retain(
         bank_id=req.vendor,
-        experience=req.notes,
+        content=req.notes,
         metadata={"outcome": req.outcome, "timestamp": req.timestamp, "type": "call"},
     )
     _timed_step("retain", "Storing new interaction in Hindsight", int((time.perf_counter() - t0) * 1000))
