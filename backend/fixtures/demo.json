@@ -1,0 +1,44 @@
+{
+  "briefing": {
+    "vendor": "nexacloud",
+    "contract": {"value": 380000, "renewal_date": "2025-12-31", "days_remaining": 18, "contact": "Marcus Chen"},
+    "tactics": [
+      {"name": "Mention AWS", "confidence": 0.87, "evidence": "Worked May 2024 — 3% discount + $8k support tier upgrade", "timing": "Early in the call, before pricing is anchored", "successes": 2, "total_uses": 2, "last_used_date": "2024-05-14", "is_anti_pattern": false, "history": null},
+      {"name": "Fiscal Q3 pressure", "confidence": 0.74, "evidence": "Worked Aug 2023 and Aug 2024 — waived fees and locked rate", "timing": "End of Q3 (August-September)", "successes": 3, "total_uses": 4, "last_used_date": "2024-08-30", "is_anti_pattern": false, "history": null},
+      {"name": "Multi-year commitment", "confidence": 0.50, "evidence": "Marcus raised unprompted Nov 2024 — roadmap access possible", "timing": "After initial concession is secured", "successes": 0, "total_uses": 0, "last_used_date": "2024-11-02", "is_anti_pattern": false, "history": null},
+      {"name": "Cancellation threat", "confidence": 0.12, "evidence": "0/3 — escalated each time, relationship damage in 2022", "timing": "AVOID", "successes": 0, "total_uses": 3, "last_used_date": "2022-11-30", "is_anti_pattern": true, "history": [{"date": "2022-03-14", "confidence": 0.40}, {"date": "2022-07-08", "confidence": 0.25}, {"date": "2022-11-30", "confidence": 0.12}]}
+    ],
+    "playbook": {
+      "opening": {"move": "Open with the AWS competitive angle", "rationale": "2/2 success rate, Marcus responds quickly", "tactic_ref": "Mention AWS"},
+      "branches": [
+        {"condition": "If Marcus says pricing is already competitive", "move": "Shift to fiscal Q3 timing pressure", "rationale": "End of quarter creates urgency on his side", "tactic_ref": "Fiscal Q3 pressure", "followup": null},
+        {"condition": "If Marcus offers multi-year proactively", "move": "Accept 3-year term in exchange for 8% discount + roadmap access", "rationale": "He raised it unprompted in Nov 2024 — he wants this", "tactic_ref": "Multi-year commitment", "followup": null}
+      ]
+    },
+    "temporal_signals": [
+      {"label": "18 days to renewal", "severity": "high"},
+      {"label": "Fiscal Q3 pressure active", "severity": "medium"}
+    ],
+    "recent_signals": [
+      {"date": "2024-11-15", "source": "email", "summary": "Marcus forwarded Q1 2026 roadmap preview", "interpretation": "Multi-year customers get early access — leverage this"},
+      {"date": "2024-11-02", "source": "call", "summary": "Marcus mentioned 3-year roadmap access unprompted", "interpretation": "Warming on multi-year commitment offer"}
+    ],
+    "pipeline_trail": [
+      {"step": "recall_memories", "status": "ok", "ms": 412, "label": "Recalling memories from Hindsight"},
+      {"step": "synthesize_briefing", "status": "ok", "ms": 1830, "label": "Synthesizing tactics via gpt-4o"},
+      {"step": "rank_tactics", "status": "ok", "ms": 87, "label": "Ranking tactics by confidence"}
+    ]
+  },
+  "ingest_response": {
+    "score_diffs": {
+      "Mention AWS": {"old": 0.87, "new": 0.79, "delta": -0.08, "direction": "down"},
+      "Multi-year commitment": {"old": 0.50, "new": 0.68, "delta": 0.18, "direction": "up"}
+    },
+    "pipeline_trail": [
+      {"step": "capture_old_scores", "status": "ok", "ms": 38, "label": "Snapshotting current confidences"},
+      {"step": "retain", "status": "ok", "ms": 540, "label": "Storing new interaction in Hindsight"},
+      {"step": "reflect", "status": "ok", "ms": 1920, "label": "Re-synthesizing tactics via BriefingAgent"},
+      {"step": "diff", "status": "ok", "ms": 12, "label": "Computing score diffs"}
+    ]
+  }
+}
