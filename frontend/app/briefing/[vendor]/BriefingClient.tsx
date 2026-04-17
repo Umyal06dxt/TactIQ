@@ -15,19 +15,25 @@ export function BriefingClient({ vendor, initial }: { vendor: string; initial: B
   const [memoryOn, setMemoryOn] = useState(true);
   const [briefing, setBriefing] = useState<Briefing>(initial);
   const [nomem, setNomem] = useState<NoMemoryResponse | null>(null);
+  const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [diffs, setDiffs] = useState<Record<string, ScoreDiff> | null>(null);
   const [flashTactics, setFlashTactics] = useState<Set<string>>(new Set());
 
   const toggleMemory = useCallback(async (next: boolean) => {
+    setLoading(true);
     setMemoryOn(next);
-    if (next) {
-      const b = await api.briefing(vendor);
-      setBriefing(b);
-      setNomem(null);
-    } else {
-      const n = await api.nomemory(vendor);
-      setNomem(n);
+    try {
+      if (next) {
+        const b = await api.briefing(vendor);
+        setBriefing(b);
+        setNomem(null);
+      } else {
+        const n = await api.nomemory(vendor);
+        setNomem(n);
+      }
+    } finally {
+      setLoading(false);
     }
   }, [vendor]);
 
@@ -63,45 +69,55 @@ export function BriefingClient({ vendor, initial }: { vendor: string; initial: B
           </p>
         </div>
         <div className="shrink-0 pt-1">
-          <MemoryToggle value={memoryOn} onChange={toggleMemory} />
+          <MemoryToggle value={memoryOn} onChange={toggleMemory} disabled={loading} />
         </div>
       </header>
 
       <PipelineStatus trail={briefing.pipeline_trail} />
 
-      {memoryOn ? (
-        <div className="space-y-8">
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {briefing.tactics.filter((t) => !t.is_anti_pattern).map((t) => (
-              <TacticCard key={t.name} tactic={t} flash={flashTactics.has(t.name) ? (diffs?.[t.name]?.direction ?? null) : null} />
-            ))}
-          </section>
-          <Playbook playbook={briefing.playbook} flashRefs={flashTactics} />
-          {antiPattern && <AntiPatternSparkline tactic={antiPattern} />}
-          <SignalFeed signals={briefing.recent_signals.slice(0, 2)} />
-          <div>
-            <button
-              onClick={() => setShowForm(true)}
-              className="rounded-lg bg-black px-5 py-3 text-white hover:bg-neutral-800"
-            >
-              Log post-call notes
-            </button>
-          </div>
-        </div>
-      ) : nomem ? (
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-neutral-500">Generic advice (no memory)</h2>
-          {nomem.tactics.map((t) => (
-            <div key={t.name} className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-4">
-              <div className="font-medium">{t.name}</div>
-              <div className="text-sm text-neutral-600">{t.advice}</div>
+      <div className={`transition-opacity duration-300 ${loading ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+        {memoryOn ? (
+          <div className="space-y-8">
+            <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {briefing.tactics.filter((t) => !t.is_anti_pattern).map((t) => (
+                <TacticCard key={t.name} tactic={t} flash={flashTactics.has(t.name) ? (diffs?.[t.name]?.direction ?? null) : null} />
+              ))}
+            </section>
+            <Playbook playbook={briefing.playbook} flashRefs={flashTactics} />
+            {antiPattern && <AntiPatternSparkline tactic={antiPattern} />}
+            <SignalFeed signals={briefing.recent_signals.slice(0, 2)} />
+            <div>
+              <button
+                onClick={() => setShowForm(true)}
+                className="rounded-lg bg-black px-5 py-3 text-white hover:bg-neutral-800"
+              >
+                Log post-call notes
+              </button>
             </div>
-          ))}
-          <div className="text-sm italic text-neutral-500">— no playbook without memory —</div>
-        </section>
-      ) : (
-        <div>Loading…</div>
-      )}
+          </div>
+        ) : nomem ? (
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold text-neutral-500">Generic advice (no memory)</h2>
+            {nomem.tactics.map((t) => (
+              <div key={t.name} className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-4">
+                <div className="font-medium text-gray-800">{t.name}</div>
+                <div className="text-sm text-neutral-600 mt-1">{t.advice}</div>
+              </div>
+            ))}
+            <div className="mt-4 rounded-lg border border-dashed border-neutral-200 bg-neutral-50 p-4 text-sm italic text-neutral-400 text-center">
+              — no playbook without memory —
+            </div>
+          </section>
+        ) : (
+          <div className="flex items-center justify-center py-20 text-neutral-400">
+            <svg className="animate-spin h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Loading…
+          </div>
+        )}
+      </div>
 
       {showForm && (
         <PostCallForm onClose={() => setShowForm(false)} onSubmit={onSubmitLog} />

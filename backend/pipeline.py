@@ -105,6 +105,16 @@ class PipelineHooks(RunHooks):
         ))
 
 
+def _demo_fallback(error_msg: str) -> tuple[dict, List[PipelineStep]]:
+    """Return canned demo fixture when the pipeline fails."""
+    _fixtures_path = os.path.join(os.path.dirname(__file__), "fixtures", "demo.json")
+    with open(_fixtures_path) as f:
+        demo = json.load(f)
+    raw = demo.get("briefing", {})
+    trail = [PipelineStep(step="pipeline", status="error", ms=0, label=f"Fallback: {error_msg[:60]}")]
+    return raw, trail
+
+
 async def run_briefing(bank_id: str, vendor_meta: dict) -> tuple[dict, List[PipelineStep]]:
     """Run BriefingAgent pipeline. Returns (raw_dict, pipeline_trail)."""
     hooks = PipelineHooks()
@@ -115,12 +125,20 @@ async def run_briefing(bank_id: str, vendor_meta: dict) -> tuple[dict, List[Pipe
         f"Follow your instructions exactly: recall -> synthesize -> rank. "
         f"Return the complete briefing JSON as your final answer."
     )
-    result = await Runner.run(BRIEFING_AGENT, input=user_input, hooks=hooks)
-    raw = json.loads(result.final_output)
-    # Agent sometimes wraps output: {"briefing": {...}} — unwrap if needed
-    if "briefing" in raw and "tactics" not in raw:
-        raw = raw["briefing"]
-    return raw, hooks.steps
+    try:
+        result = await Runner.run(BRIEFING_AGENT, input=user_input, hooks=hooks)
+        try:
+            raw = json.loads(result.final_output)
+        except (json.JSONDecodeError, TypeError) as e:
+            print(f"WARNING: LLM returned non-JSON, falling back to demo: {e}")
+            return _demo_fallback(str(e))
+        # Agent sometimes wraps output: {"briefing": {...}} — unwrap if needed
+        if "briefing" in raw and "tactics" not in raw:
+            raw = raw["briefing"]
+        return raw, hooks.steps
+    except Exception as e:
+        print(f"WARNING: Pipeline failed, falling back to demo: {e}")
+        return _demo_fallback(str(e))
 
 
 def _norm_playbook(pb) -> dict:
