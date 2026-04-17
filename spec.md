@@ -11,7 +11,12 @@
 
 Build a buyer-side vendor negotiation memory tool. A procurement manager clicks a vendor, sees a briefing with confidence-scored tactics drawn from past interactions, logs what happened after the call, and watches the confidence scores update live. Memory is the product — without Hindsight the app has nothing to show.
 
-**Single demo-winning moment:** post-call log submit → animated confidence score diffs. This must be flawless. Everything else is secondary.
+**Demo arc (two beats — both must be flawless):**
+
+1. **Opening beat** — flip the Memory toggle OFF. Briefing collapses to generic Groq advice, empty playbook placeholder. Flip ON. Hindsight-powered briefing materialises: branching playbook, named tactics with dated evidence, anti-pattern sparkline pinned at the bottom. This is the A/B that sells Hindsight.
+2. **Closing beat** — post-call log submit. Score diffs animate (green up / red down), the playbook visibly redraws in place, moves tied to changed tactics flash green/red. This is the "chess engine reevaluates" moment.
+
+Everything else is secondary.
 
 ---
 
@@ -24,13 +29,15 @@ Build a buyer-side vendor negotiation memory tool. A procurement manager clicks 
 3. **Vendor dashboard** — list of 3 vendors with contract value, renewal date, days remaining (red <30d), interaction count
 4. **Pre-call briefing** — click vendor → `reflect()` → render tactic cards + temporal banner + recent signals
 5. **Confidence score display** — tactic card with name, 5-dot rating (colour-coded), numeric score, evidence, timing
-6. **Post-call logger** — text form → `retain()` → `reflect()` → return updated scores + diffs
-7. **Live score update animation** — old → new value, green if up, red if down
+6. **Playbook (ordered script)** — branching negotiation play generated from top tactics, rendered as a decision tree above the tactic cards ("chess engine" moment — this is the demo's centre of gravity)
+7. **Anti-pattern sparkline** — at least one tactic card displays a small descending sparkline showing confidence decay over time (e.g. "Cancellation threat — dropping since 2022"), red border, "AVOID" tag
+8. **Before/after memory toggle** — switch on briefing screen. OFF → `POST /api/briefing/nomemory` (Groq with just vendor name, generic advice). ON → `GET /api/briefing` (Hindsight). Opens the demo; the A/B contrast is what sells Hindsight.
+9. **Post-call logger** — text form → `retain()` → `reflect()` → return updated scores + diffs + redrawn playbook
+10. **Live score update animation** — old → new value, green if up, red if down. Playbook visibly redraws in place.
 
 ### 2.2 Nice-to-have (P1 — only after P0 is complete)
 
-- Before/after memory toggle (Groq-only vs Hindsight-powered)
-- Confidence evolution chart (Recharts LineChart)
+- Confidence evolution chart (Recharts LineChart) — extends the anti-pattern sparkline into full per-tactic history
 - Email ingestion parser (paste thread → Groq extract → `retain()`)
 - Vendor comparison panel
 - Interaction timeline
@@ -51,7 +58,7 @@ Real email/CRM integrations, OAuth, live call transcription, multi-user auth, mo
 | Frontend      | Next             | Next16                     |
 | Styling       | Tailwind CSS     | v3.4                       |
 | HTTP client   | Axios            | v1.6                       |
-| Charts (P1)   | Recharts         | v2.10                      |
+| Charts        | Recharts (or inline SVG) | v2.10              |
 | Backend       | Python + FastAPI | Python 3.11, FastAPI 0.109 |
 | Orchestration | CascadeFlow      | per docs                   |
 | Memory        | Hindsight Cloud  | `hindsight-client` pip     |
@@ -83,6 +90,9 @@ leverage/
 │       │   └── Briefing.jsx
 │       └── components/
 │           ├── TacticCard.jsx
+│           ├── AntiPatternSparkline.jsx
+│           ├── Playbook.jsx
+│           ├── MemoryToggle.jsx
 │           ├── TemporalBanner.jsx
 │           ├── SignalFeed.jsx
 │           ├── PostCallForm.jsx
@@ -158,7 +168,7 @@ VITE_API_URL=http://localhost:8000
 | `GET`  | `/api/vendors`                            | List 3 vendors with summary stats for dashboard   |
 | `GET`  | `/api/briefing?vendor={bank_id}`          | Generate briefing via `reflect()`                 |
 | `POST` | `/api/ingest`                             | Log post-call note, return briefing + score diffs |
-| `POST` | `/api/briefing/nomemory?vendor={bank_id}` | P1: Groq-only briefing (no Hindsight)             |
+| `POST` | `/api/briefing/nomemory?vendor={bank_id}` | Groq-only briefing (no Hindsight) — powers the A/B toggle |
 | `POST` | `/api/email/parse`                        | P1: parse email thread, retain summary            |
 
 
@@ -175,9 +185,51 @@ VITE_API_URL=http://localhost:8000
       "evidence": "string",
       "timing": "string",
       "successes": 2,
-      "total_uses": 2
+      "total_uses": 2,
+      "is_anti_pattern": false,
+      "history": [
+        { "date": "2022-Q1", "confidence": 0.65 },
+        { "date": "2023-Q2", "confidence": 0.38 },
+        { "date": "2024-Q2", "confidence": 0.19 },
+        { "date": "2024-Q4", "confidence": 0.12 }
+      ]
     }
   ],
+  "playbook": {
+    "opening": {
+      "move": "Reference Q3 fiscal pressure",
+      "rationale": "87% historical success — worked 2022, 2023, 2024",
+      "tactic_ref": "Fiscal Q3 pressure"
+    },
+    "branches": [
+      {
+        "condition": "if pushback on timeline",
+        "move": "AWS benchmark pivot",
+        "rationale": "$/core comparison — won 5% discount Nov 2023, 3% + $8k support tier May 2024",
+        "tactic_ref": "AWS mention",
+        "followup": [
+          {
+            "condition": "if still resistant",
+            "move": "Hint multi-year commitment",
+            "rationale": "Untested but hot — Marcus raised unprompted Nov 18 2024",
+            "tactic_ref": "Multi-year commitment"
+          }
+        ]
+      },
+      {
+        "condition": "if counter >= 8%",
+        "move": "Accept and lock renewal cap",
+        "rationale": "Above historical average (6.2%)",
+        "tactic_ref": null
+      },
+      {
+        "condition": "if counter < 5%",
+        "move": "Silence tactic",
+        "rationale": "67% average concession follow-up",
+        "tactic_ref": null
+      }
+    ]
+  },
   "temporal_signals": [
     { "signal": "string", "urgency": "high", "days_remaining": 18 }
   ],
@@ -196,6 +248,12 @@ VITE_API_URL=http://localhost:8000
   }
 }
 ```
+
+**Notes:**
+- `is_anti_pattern` defaults to `false`. When `true`, the tactic card renders with red border, "AVOID" tag, and the sparkline drawn from `history`.
+- `history` is only required on tactics with `is_anti_pattern: true`. 4–5 descending points minimum. Other tactics may omit it or return `null`.
+- `playbook` must branch at least once (opening → one conditional move). Two or three branches is ideal for demo legibility.
+- `playbook.branches[].tactic_ref` is the `name` of a tactic in `tactics[]` when the move maps to one (for score-diff highlighting after post-call log); otherwise `null`.
 
 `**POST /api/ingest**` request:
 
@@ -235,9 +293,29 @@ a valid JSON object with this exact structure:
       "evidence": "string — what the evidence says",
       "timing": "string — when to deploy this tactic",
       "successes": 2,
-      "total_uses": 2
+      "total_uses": 2,
+      "is_anti_pattern": false,
+      "history": null
     }
   ],
+  "playbook": {
+    "opening": {
+      "move": "string — opening move, under 12 words",
+      "rationale": "string — one-sentence reason tied to evidence",
+      "tactic_ref": "string — name of matching tactic from tactics[], or null"
+    },
+    "branches": [
+      {
+        "condition": "string — 'if <counterparty response>'",
+        "move": "string — next move, under 12 words",
+        "rationale": "string — one-sentence reason tied to evidence",
+        "tactic_ref": "string or null",
+        "followup": [
+          { "condition": "string", "move": "string", "rationale": "string", "tactic_ref": "string or null" }
+        ]
+      }
+    ]
+  },
   "temporal_signals": [
     { "signal": "string", "urgency": "high", "days_remaining": 18 }
   ],
@@ -246,6 +324,22 @@ a valid JSON object with this exact structure:
   ],
   "contract": { "value": "$380k", "renewal_date": "Dec 31", "contact": "Marcus Chen" }
 }
+
+Rules for tactics:
+- Return at least 3 tactics sorted by confidence descending.
+- For any tactic with confidence < 0.20 AND ≥ 2 failed uses across multiple years,
+  set "is_anti_pattern": true and provide "history" as an array of 4–5
+  {date, confidence} points showing the decay over time (earliest first, most
+  recent last). Otherwise "history": null.
+
+Rules for playbook:
+- Always provide one "opening" move (highest-confidence tactic or strongest
+  temporal signal).
+- Always provide 2–4 "branches" covering the most likely counterparty responses.
+- Each branch's "tactic_ref" must match a tactic.name in tactics[] when the
+  move derives from a stored tactic; otherwise null.
+- At most one level of "followup" nesting per branch. Keep the tree legible.
+- Do not include branches for scenarios the memory has no evidence for.
 '''
 ```
 
@@ -307,15 +401,44 @@ async def log_post_call(vendor: str, notes: str, timestamp: str):
 - **Header bar**
   - Left: "Pre-call briefing · Leverage" + vendor name ("NexaCloud — annual renewal")
   - Right: red countdown box "Call in 4h 32m"
+  - Far right: **Memory toggle** (see §6.4) — always visible in header so the A/B contrast is one click away during demo
 - **Stats row (3 cards)**: Annual value · Renewal date · Interactions logged
-- **Tactic cards** (section label: "Recommended tactics — from Hindsight memory")
-  - Sorted descending by confidence
+- **Playbook panel** (section label: "Your play — generated from memory") — RENDERED ABOVE TACTIC CARDS, this is the demo's centre of gravity
+  - Component: `Playbook.jsx`
+  - Opening move at top, bold, large type. Rationale as subdued caption below.
+  - Branches rendered as an indented decision tree using Unicode box-drawing or styled borders:
+    ```
+    OPENING  Reference Q3 fiscal pressure
+             └ 87% historical success — worked 2022, 2023, 2024
+
+    ├ if pushback on timeline
+    │   → AWS benchmark pivot
+    │     └ Won 5% Nov 2023, 3% + $8k support May 2024
+    │   └ if still resistant
+    │       → Hint multi-year commitment
+    │         └ Untested but hot — Marcus raised unprompted Nov 18
+
+    ├ if counter ≥ 8%
+    │   → Accept and lock renewal cap
+
+    └ if counter < 5%
+        → Silence tactic  (67% avg concession follow-up)
+    ```
+  - Each move that has a non-null `tactic_ref` is click-highlightable and visually linked to the matching tactic card below.
+  - After post-call log submit, playbook re-renders with a brief cross-fade. Any move whose underlying tactic changed confidence gets a green/red flash border.
+- **Tactic cards** (section label: "Tactics in memory")
+  - Sorted descending by confidence, BUT anti-pattern cards always pinned to the bottom under their own subheader "Anti-patterns — do not use"
   - Each card: name (bold), 5-dot rating, numeric score
   - Dot colours:
     - **Green** if `confidence > 0.75`
     - **Amber** if `0.50 ≤ confidence ≤ 0.75`
     - **Grey** if `confidence < 0.50`
   - Below: evidence paragraph, evidence tags, timing recommendation
+  - **Anti-pattern variant** — when `is_anti_pattern: true`:
+    - Red border around the card
+    - "AVOID" pill (red background, white text) next to name
+    - Small sparkline component (`AntiPatternSparkline.jsx`, ~120×30px, Recharts `LineChart` or inline SVG) plotting `history` points — descending line, red stroke
+    - Caption under sparkline: "Confidence falling since {first history date}"
 - **Temporal banner** (red background): "Fiscal year pressure window: 18 days remaining" + one explanatory sentence
 - **Recent signals feed**: last 3–5 from `recall()`. Each: date, source (email/call), summary, italic interpretation
 - **Footer**: memory status line + button "Log post-call notes" → post-call form
@@ -331,14 +454,16 @@ async def log_post_call(vendor: str, notes: str, timestamp: str):
   1. `POST /api/ingest`
   2. Show `ScoreDiff` panel — animated lines like `AWS mention: 0.87 → 0.91 (+0.04)` in green (or red for decreases)
   3. Pause ~2s for judges to read
-  4. Auto-navigate back to briefing with refreshed scores
+  4. Auto-navigate back to briefing — new playbook cross-fades in; moves tied to changed tactics flash green/red for ~800ms; new tactic scores already reflected in dot colours
 
-### 6.4 Before/after toggle (P1)
+### 6.4 Before/after memory toggle
 
-- Switch on briefing screen
-- OFF → calls `POST /api/briefing/nomemory` (Groq with just vendor name, no context) — renders generic advice
-- ON → normal Hindsight briefing
-- Side-by-side or toggle both acceptable
+- Switch on briefing screen header (always visible — see §6.2)
+- Label: "Memory: ON" / "Memory: OFF". Animated thumb slider.
+- OFF → calls `POST /api/briefing/nomemory` (Groq with just the vendor name and role, no Hindsight context) — renders a deliberately generic briefing: vague openers ("Build rapport"), no named tactics, no dates, no dollar deltas, empty playbook placeholder ("Memory required for play generation")
+- ON → `GET /api/briefing` — full Hindsight briefing with playbook, tactics, evidence, anti-patterns
+- Default state on first visit: ON. Demo opens by flipping it OFF, then ON.
+- Transition: 250ms cross-fade. No full page reload.
 
 ### 6.5 Confidence evolution chart (P1)
 
@@ -382,15 +507,19 @@ python seeder/seed_vendors.py
 2. Hindsight Cloud account, apply `MEMHACK409`, confirm keys work with a trivial `retain()` call
 3. `vendor_data.py` — write the 53 interactions (longest single task — budget 2–3 hours)
 4. `seed_vendors.py` — run it, verify banks populate
-5. `backend/main.py` + `briefing.py` — implement `GET /api/briefing` with hardcoded `BRIEFING_PROMPT`. Test via curl.
-6. Frontend Vite + Tailwind scaffold, API client, routing
-7. `Dashboard.jsx` → `Briefing.jsx` with `TacticCard`, `TemporalBanner`, `SignalFeed` (static styling first, wire API second)
-8. `ingest.py` — implement the exact 4-step flow in §5.4
-9. `PostCallForm.jsx` + `ScoreDiff.jsx` — animated diffs
-10. **Smoke-test the full loop 5× end-to-end**
-11. Deploy: Railway (backend) + Vercel (frontend). Update `VITE_API_URL`.
-12. Only now touch P1 features
-13. Record demo video, write article, push final README
+5. `backend/main.py` + `briefing.py` — implement `GET /api/briefing` with hardcoded `BRIEFING_PROMPT` (include playbook + anti-pattern fields). Test via curl.
+6. `briefing.py` — add `POST /api/briefing/nomemory` route (Groq-only, deliberately generic output — no Hindsight calls). Test via curl.
+7. Frontend Vite + Tailwind scaffold, API client, routing
+8. `Dashboard.jsx` → `Briefing.jsx` skeleton with `TacticCard`, `TemporalBanner`, `SignalFeed` (static styling first, wire API second)
+9. `Playbook.jsx` — render branching decision tree from `playbook` field. Static mock first, then wire.
+10. `AntiPatternSparkline.jsx` — Recharts `LineChart` or inline SVG from `history` array. Anti-pattern card variant styling.
+11. `MemoryToggle.jsx` — header switch that swaps between `/api/briefing` and `/api/briefing/nomemory`
+12. `ingest.py` — implement the exact 4-step flow in §5.4
+13. `PostCallForm.jsx` + `ScoreDiff.jsx` — animated diffs + playbook re-render cross-fade
+14. **Smoke-test the full loop 5× end-to-end** — OFF → ON → log → redraw
+15. Deploy: Railway (backend) + Vercel (frontend). Update `VITE_API_URL`.
+16. Only now touch P1 features
+17. Record demo video, write article, push final README
 
 ---
 
@@ -399,13 +528,18 @@ python seeder/seed_vendors.py
 - `python seeder/seed_vendors.py` completes with no errors and populates 3 banks
 - `GET /api/vendors` returns 3 vendors with correct stats
 - `GET /api/briefing?vendor=nexacloud` returns parseable JSON matching the schema in §5.2, with ≥3 tactics sorted by confidence descending, top tactic confidence ≥ 0.80
+- `POST /api/briefing/nomemory?vendor=nexacloud` returns generic Groq output with empty/placeholder playbook and no named tactics, evidence, or dates
 - Dashboard renders 3 vendor cards; NexaCloud card shows red "days remaining" badge
 - Briefing screen renders within 2 seconds of vendor click
 - Tactic cards show correct dot colours per thresholds in §6.2
+- At least one tactic in the NexaCloud briefing has `is_anti_pattern: true` and renders with red border, "AVOID" tag, and a descending sparkline
+- Playbook panel renders an opening move + at least 2 branches; moves are visually linked (click-highlight) to their `tactic_ref` cards
+- Memory toggle is visible in the briefing header; flipping OFF shows a visibly inferior briefing within 2 seconds; flipping ON restores the full briefing. Transition cross-fades, does not full-reload.
 - Temporal banner visible with days-remaining number
 - Recent signals feed shows ≥3 entries with dates, sources, and italic interpretations
 - Post-call form submission triggers the full §5.4 flow
 - Score diffs visibly animate old→new with green/red colour coding within 3 seconds of submit
+- Playbook visibly redraws after the score diff; moves tied to changed tactics flash green/red briefly
 - At least one tactic's confidence changes (direction + magnitude) per post-call log
 - Full demo script (§10 in source doc) runs in ≤5 minutes with no dead time
 - Repo is public, README renders, `.env.example` present, no secrets committed
