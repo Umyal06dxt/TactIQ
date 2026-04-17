@@ -23,11 +23,12 @@ For the hackathon, the deliverable is a working demo of the procurement wedge: o
 
 ## Constraints
 
-- **Hard time budget: 10 hours end-to-end.** Spec as originally written was 13–15 hrs of work. We cut to fit.
-- **Required sponsor tools:** Hindsight Cloud (memory), CascadeFlow (orchestration), OpenAI GPT-4 class model (synthesis). CascadeFlow must be visibly used in the demo, not buried in backend plumbing.
-- **Minimum two rehearsals** of the full 5-minute demo before the submission cutoff. Backup recording must exist by hour 8.
+- **Hard time budget: 10 hours of build.** Spec as originally written was 13–15 hrs. We cut to fit, AND we require ~3 hrs of active pre-hackathon prep (account setup, deploy smoke, scaffold) plus an overnight Hindsight synthesis wait after seeding. All of that sits outside the 10-hour sprint clock. See Pre-hackathon prep section below.
+- **Required sponsor tools:** Hindsight Cloud (memory), CascadeFlow (orchestration), OpenAI GPT-4 class model for the briefing synthesis, Groq for the nomemory endpoint (fast + free-tier friendly, produces deliberately generic advice for the toggle OFF state). CascadeFlow must be visibly used in the demo, not buried in backend plumbing.
+- **Minimum two rehearsals** of the full 5-minute demo before submission. Backup recording must exist by hour 8.5.
+- **DEMO_MODE fallback.** Ship a single `DEMO_MODE=true` env var that stubs **every** `/api/*` endpoint with canned responses — briefing, nomemory, ingest, vendors. Not per-endpoint. When set, the app runs fully offline with deterministic fixture data loaded from `backend/fixtures/demo.json`. Toggle on during live demo if network or Hindsight flakes. Decide at the podium, not at hour 9.5.
 - **Public GitHub repo** with clean README, accurate `.env.example`, no secrets committed.
-- **Seeder must run at least 24 hours before demo.** Hindsight needs time for Observation synthesis to stabilize. Empty memory banks = disqualifying.
+- **Hindsight synthesis latency.** Hindsight needs time to synthesize Observations from raw Experiences. Official spec said "24 hours," actual latency is unknown. Seeder must run at start of pre-hackathon prep (hour -3) and ideally the night before. If synthesis is still stabilizing at hour 5, `reflect()` may return thin Opinions — acceptable, `BRIEFING_PROMPT` will still produce tactics.
 - **No real integrations.** No OAuth, no live CRM/email ingestion, no billing, no mobile responsive, no multi-user auth.
 
 ## Premises
@@ -38,7 +39,7 @@ All five premises below were presented to the builder and agreed to. They shape 
 2. **The hero demo moment is the before/after memory toggle** (generic AI advice vs. scored tactics with evidence), not the post-call diff animation. This flips P0/P1 from the original spec: toggle → P0 hero, post-call diff → P0 supporting beat with simpler CSS-transition animation.
 3. **10 hours requires pre-committed scope cuts.** Temporal banner inlines to a one-line badge on the dashboard card. Recent signals feed trims to 2 items. Diff animation is CSS `transition` + arrow icon, not an animation library. Confidence-evolution chart and email-parsing P1 features stay P1 — will not ship.
 4. **"Million dollar idea" is narrative framing, not scope expansion.** Same code, different pitch. The README hero, demo intro, and closing slide position LEVERAGE as "institutional memory for every repeated B2B negotiation" with procurement as wedge, sales/legal/M&A/hiring as expansion.
-5. **CascadeFlow must be visible in the demo.** Proposal: during briefing load and during ingest, render a 3-line status trail showing CascadeFlow orchestrating the pipeline (recall → synthesize → rank). Non-trivial visually, 20 min of dev, earns sponsor judge points.
+5. **CascadeFlow must be visible in the demo.** During briefing load and during ingest, render a 3-line status trail showing CascadeFlow orchestrating the pipeline (recall → synthesize → rank). Backend emits intermediate status via sequential API calls (simplest option) or SSE (if time allows). Realistic budget: 60 min of dev. Earns sponsor judge points.
 
 ## Approaches Considered
 
@@ -48,7 +49,7 @@ All five premises below were presented to the builder and agreed to. They shape 
 - All polish goes into one screen: toggle + tactics + signals + inline post-call form.
 - Pros: Less to build, less to break, every pixel rehearsed. Highest polish per hour.
 - Cons: Loses the "this scales to 1000s of vendors" story. Dashboard is a classic platform signal — dropping it weakens the company framing.
-- Effort: 7 hr dev / 2 hr polish / 1 hr buffer. Completeness 8/10.
+- Effort: 7 hr dev / 2 hr polish / 1 hr buffer.
 
 ### Approach B: Broad shallow — spec with the flips _(chosen)_
 
@@ -58,7 +59,7 @@ All five premises below were presented to the builder and agreed to. They shape 
 - CascadeFlow status trail on briefing load and ingest.
 - Pros: Tells the scale story, strongest "million dollar" feel, closest to spec already designed.
 - Cons: Tightest timeline if Hindsight integration surprises land in hour 4–5.
-- Effort: 9 hr dev / 45 min polish / 15 min buffer. Completeness 9/10.
+- Effort: 8.5 hr dev / 1 hr rehearsal+video+smoke / 30 min submission+polish. Requires pre-hackathon prep (see below). No in-sprint buffer — cut rules replace buffer.
 
 ### Approach C: Chat-first — no dashboard
 
@@ -66,7 +67,7 @@ All five premises below were presented to the builder and agreed to. They shape 
 - Same Hindsight calls; no dashboard, no routing, one screen.
 - Pros: 2026-native UI. Feels like an AI product, not a CRM. Judges respond to chat demos.
 - Cons: Requires explaining "why chat" to judges (procurement managers don't actually want chat, they want pre-call briefings). The narrative tax eats demo time.
-- Effort: 6 hr dev / 2 hr polish / 2 hr buffer. Completeness 7/10.
+- Effort: 6 hr dev / 2 hr polish / 2 hr buffer.
 
 ## Recommended Approach
 
@@ -78,7 +79,7 @@ Architecture:
 leverage/
 ├── seeder/
 │   ├── seed_vendors.py
-│   └── vendor_data.py          # 53 interactions
+│   └── vendor_data.py          # 30 interactions (23+4+3)
 ├── backend/
 │   ├── main.py                 # FastAPI routes + CORS
 │   ├── briefing.py             # reflect() → tactics JSON
@@ -121,29 +122,79 @@ The hero moment — `MemoryToggle.tsx` — is a single switch at the top of the 
 
 The supporting beat — `PostCallForm` + `ScoreDiff` — executes the exact 4-step flow in spec §5.4 (capture old scores → retain() → recompute → diff with 0.01 threshold). Diffs render as `0.87 → 0.91` with CSS `transition: color 400ms` and ↑/↓ arrow. Green on up, red on down. No animation library.
 
-`CascadeStatus.tsx` renders on both briefing load and ingest:
+`CascadeStatus.tsx` renders on both briefing load and ingest. Backend measures real latency per call (`performance.now()` at endpoint entry/exit) and returns timings in the response. Memory count comes from the vendor's actual seeded interaction count, passed through from `/api/vendors`. Example on NexaCloud:
 
 ```
-✓ Recalled 23 memories from Hindsight (240ms)
-✓ Synthesized 4 tactics via gpt-4o (1.2s)
-✓ Ranked by confidence (10ms)
+✓ Recalled 23 memories from Hindsight (measured ms)
+✓ Synthesized 4 tactics via gpt-4o (measured ms)
+✓ Ranked by confidence (measured ms)
 ```
 
-Fades out after tactics render. Makes CascadeFlow the nervous system of the demo rather than an invisible dependency.
+For SecureNet the first line reads "Recalled 14 memories," for DataPipe "Recalled 16 memories" — dynamic per vendor. Fades out after tactics render. Makes CascadeFlow the nervous system of the demo rather than an invisible dependency.
 
-### Build order — 10-hour sequence with pre-committed cut checkpoints
+### Confidence score formula
 
-| Hour     | Work                                                                                                                                                                                                 | Cut rule if behind                                                                                                               |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| 0.0–1.0  | Hindsight account + MEMHACK409 promo + `.env` scaffold + trivial `retain()` test. Next app scaffold + Tailwind. Repo on GitHub with `.env.example`.                                                  | If Hindsight signup delays >30 min, open a support ticket and proceed with mocked client locally.                                |
-| 1.0–3.5  | `vendor_data.py` — 53 interactions. Real names, dollar amounts, dates. Faker for filler only. Embed every pattern in §4.3 with at least as many datapoints as `total_uses`. **Longest single task.** | At hour 3.5: if not done, ship with 40 interactions (drops NexaCloud 23→18, DataPipe 16→12, SecureNet 14→10).                    |
-| 3.5–5.0  | `main.py` routes, `briefing.py` with `BRIEFING_PROMPT`, `nomemory.py` with generic advice prompt. Curl-test both.                                                                                    | At hour 5: if `reflect()` returns invalid JSON, fallback is a Groq call wrapped in a try/except with the same prompt.            |
-| 5.0–6.0  | `ingest.py` §5.4 flow. Curl-test with sample note. Confirm diffs render.                                                                                                                             | At hour 6: if ingest broken, stub a deterministic `/api/ingest` that returns canned diffs. The demo works without live retain(). |
-| 6.0–7.0  | `VendorCard`, Dashboard page, `api.ts` client, basic routing.                                                                                                                                        | At hour 7: if dashboard unstyled, ship with minimal Tailwind — judges look at the briefing screen, not this.                     |
-| 7.0–8.5  | Briefing page: `TacticCard`, `MemoryToggle` (hero), `CascadeStatus`, trimmed signals, inline temporal badge.                                                                                         | At hour 8.5: if toggle doesn't render, drop it and revert to the original diff-as-hero (weaker but shippable).                   |
-| 8.5–9.0  | `PostCallForm` + `ScoreDiff`. Deploy to Vercel + Railway. Fix CORS.                                                                                                                                  | At hour 9: if deploy fails, demo locally and record backup video immediately.                                                    |
-| 9.0–9.5  | Smoke-test end-to-end 3×. Record backup demo video (even if deploy succeeded — always have this).                                                                                                    | —                                                                                                                                |
-| 9.5–10.0 | Rehearse live demo 2×. Final README polish.                                                                                                                                                          | —                                                                                                                                |
+Scores must be stable across renders — an LLM picking floats will drift. Formula lives in `briefing.py`:
+
+```python
+def confidence(successes: int, total_uses: int, months_since_last_use: float) -> float:
+    if total_uses == 0:
+        return 0.0
+    base = successes / total_uses
+    recency_decay = max(0.3, 0.9 ** months_since_last_use)
+    return round(base * recency_decay, 2)
+```
+
+The `BRIEFING_PROMPT` asks the LLM to emit `successes`, `total_uses`, and `last_used_date` for each tactic. Backend computes `confidence` deterministically before returning. LLM never picks the float directly — it just extracts structured facts from memory.
+
+### NOMEMORY_PROMPT (the toggle-OFF state)
+
+Goes in `prompts.py` alongside `BRIEFING_PROMPT`. Explicit about being generic — the demo requires the output to be recognizably textbook:
+
+```python
+NOMEMORY_PROMPT = '''
+You are a generic procurement AI. The user is about to renew a SaaS contract
+with a vendor called "{vendor_name}". You have no history, no evidence, no
+context about prior negotiations. Return ONLY a valid JSON object:
+{
+  "tactics": [
+    { "name": "string — under 10 words", "advice": "one-sentence textbook recommendation" }
+  ]
+}
+Produce exactly 3 tactics. Keep each one deliberately generic — the kind of
+advice any procurement blog post would give. Do not invent facts about the
+vendor. Do not ask clarifying questions.
+'''
+```
+
+Runs on Groq for speed; output renders flat and contextless in the UI, setting up the toggle-ON "whoa."
+
+### Pre-hackathon prep (hour -3 to 0)
+
+Done the day before, or in the ~3 hours before the sprint clock starts. Not counted in the 10-hour budget. This is non-negotiable — skipping it guarantees the 10 hours will overrun.
+
+| Pre-hour         | Work                                                                                                                                                                                                                                                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| -3.0 to -2.0     | Hindsight Cloud signup + MEMHACK409 promo applied. Verify API key with trivial `client.retain()` + `client.reflect()` round-trip. Save response shape to a file for reference.                                                                                                                                  |
+| -2.0 to -1.0     | Repo on GitHub. Next.js 15 (App Router) + Tailwind v3.4 scaffold. Python 3.11 FastAPI scaffold with one healthcheck route. `.env.example` committed. `requirements.txt` and `package.json` pinned.                                                                                                              |
+| -1.0 to 0.0      | **Deploy smoke.** Push empty scaffolds to Vercel (frontend) + Railway (backend). Verify `/health` returns 200 from the Railway URL. Verify the Next.js app renders from Vercel. Verify CORS config works between the two domains. This is the test that proves deployment is solved before you write real code. |
+| The night before | Run `seed_vendors.py` against the three empty banks. Let Hindsight synthesize overnight. If you can't run this the night before, run it at hour -3 and accept thinner Observations.                                                                                                                             |
+
+### Build order — 10-hour sprint with pre-committed cut checkpoints
+
+| Hour     | Work                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Cut rule if behind                                                                                                                                                                                                                                                                           |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0.0–2.5  | `vendor_data.py` — **30 interactions total: 23 NexaCloud + 4 DataPipe + 3 SecureNet.** Real names, dollar amounts, dates. Faker for filler only. Of the 23 NexaCloud interactions, 9 directly support the 4 on-screen tactics (evidence, track records); the remaining 14 are context for Hindsight synthesis. DataPipe and SecureNet exist to populate dashboard cards only — their briefings do not need to be demo-quality. `seed_vendors.py` runs the batch. | At hour 2.0: if writing is slower than expected, ship with 20 interactions (17+2+1). At hour 2.5: STOP the data work, move on even if incomplete.                                                                                                                                            |
+| 2.5–4.0  | `main.py` routes, `briefing.py` with `BRIEFING_PROMPT` + confidence formula, `nomemory.py` with `NOMEMORY_PROMPT` on Groq. Curl-test both endpoints against the seeded banks.                                                                                                                                                                                                                                                                                    | At hour 4: if `reflect()` returns invalid JSON, wrap `json.loads()` in try/except and fall back to direct OpenAI call with the same prompt.                                                                                                                                                  |
+| 4.0–5.0  | `ingest.py` §5.4 flow: capture old scores → `retain()` → recompute → diff at 0.01 threshold. Curl-test with a sample note. Confirm at least one tactic score changes.                                                                                                                                                                                                                                                                                            | At hour 5: if live ingest is flaky, stub `/api/ingest` with canned diffs (`DEMO_MODE`). Demo survives without live `retain()`.                                                                                                                                                               |
+| 5.0–6.0  | `api.ts` client, `VendorCard`, Dashboard page with 3 cards + lightweight routing. Red badge + inline temporal line on NexaCloud.                                                                                                                                                                                                                                                                                                                                 | At hour 6: if dashboard is unstyled, ship minimal Tailwind. Judges spend 10 seconds here.                                                                                                                                                                                                    |
+| 6.0–8.0  | Briefing page hero: `TacticCard`, `MemoryToggle` (hero), `CascadeStatus` (~60 min alone), trimmed 2-item signals feed. Wire toggle to `/api/briefing/nomemory` vs `/api/briefing`.                                                                                                                                                                                                                                                                               | At hour 7.5: if `MemoryToggle` flaky, ship diff-as-hero instead (weaker pitch, but shippable). At hour 8: if `CascadeStatus` not wired, fake the step labels client-side with `setTimeout` AND remove the millisecond footers — render checkmarks + labels only. Do not invent fake timings. |
+| 8.0–8.5  | `PostCallForm` + `ScoreDiff` with CSS transitions + arrow icon. Wire to `/api/ingest`.                                                                                                                                                                                                                                                                                                                                                                           | At hour 8.5: if diffs don't render, show a plain "saved" confirmation. The toggle hero still carries the demo.                                                                                                                                                                               |
+| 8.5–9.0  | Record backup demo video on local machine (always — even if deploy succeeded). Upload to GitHub Releases, paste link into README. Capture 2–3 README screenshots while recording. Verify Railway + Vercel still responding. Final CORS sanity check. Draft the Priya hero paragraph + million-dollar framing in README.                                                                                                                                          | —                                                                                                                                                                                                                                                                                            |
+| 9.0–9.5  | Smoke-test end-to-end 3× against the live deployment. Fix any last-mile issue.                                                                                                                                                                                                                                                                                                                                                                                   | —                                                                                                                                                                                                                                                                                            |
+| 9.5–10.0 | Rehearse live demo 2× (10 min). Final README polish (5 min). Hackathon submission form (5 min). Hit submit with 10 min to spare.                                                                                                                                                                                                                                                                                                                                 | At hour 9.75: if rehearsals reveal a bug, swap to the backup video and submit — do not debug live.                                                                                                                                                                                           |
+
+**Post-submission (outside the 10 hr):** 400–600 word article + LinkedIn post. Budget ~60 min, done after the submission cutoff.
 
 ### The 5-minute demo script
 
@@ -161,11 +212,15 @@ Fades out after tactics render. Makes CascadeFlow the nervous system of the demo
 
 ## Open Questions
 
-- **What LLM does the user's OpenAI key support?** Spec said "gpt-5-4" which doesn't exist. If the key has GPT-5 access, use it for the briefing prompt (better JSON fidelity). If only GPT-4, use `gpt-4o` — it's reliable with structured output.
-- **Is Groq actually needed, or is it a fallback only?** Spec lists `GROQ_API_KEY` but the flow only calls OpenAI. Recommend: use Groq for the `nomemory` endpoint (generic advice) because it's fast and free-tier friendly — good contrast with OpenAI-backed Hindsight briefing.
-- **CascadeFlow specifics.** Which CascadeFlow primitives are required (steps, pipelines, sub-agents)? The status trail UI works regardless, but backend implementation depends on CascadeFlow's API surface. Read sponsor docs hour 0.
-- **Does Hindsight's `reflect()` return stable JSON?** Risk in §10 of spec. Mitigation: wrap `json.loads()` in try/except; on parse failure, call OpenAI directly with the same prompt. Pre-test this hour 3.5.
-- **Demo venue constraints.** Is the live demo on stage or over video call? Over video, run everything locally. On stage, always have the backup recording queued — spec §10 mitigation is correct.
+- **What LLM does the user's OpenAI key support?** Original spec said "gpt-5-4" which doesn't exist. If the key has GPT-5 access, use it for the briefing prompt (better JSON fidelity). Otherwise `gpt-4o` — reliable with structured output.
+- **CascadeFlow specifics.** Which CascadeFlow primitives are required (steps, pipelines, sub-agents)? The `CascadeStatus` UI works regardless, but backend implementation depends on CascadeFlow's API surface. Read sponsor docs during pre-hackathon prep, not during the sprint.
+- **Hindsight synthesis latency.** Official line is "24 hours" but unverified. Ideal: seed one trial bank 24 hrs before prep begins to measure synthesis latency at T+1hr, T+6hr, T+24hr. If that's not possible, seed all three banks the night before the sprint (T-12hr-ish) and accept whatever synthesis state exists at hour 0. The 24hr probe sits outside the prep window — don't try to squeeze it inside.
+- **Demo venue: stage or video call?** Over video, run everything locally and screenshare — network isolation eliminates one class of failures. On stage, always have the backup recording queued behind the live demo (spec §10 mitigation). Confirm venue 24h before.
+- **Projector aspect ratio.** Some hackathon venues use 1080p, some use 4:3, some use unexpected ultrawide. Tailwind breakpoints should tolerate 1366×768 through 1920×1080 without layout breaks. Test both during rehearsal.
+
+## Note on original spec references
+
+This doc cites the user's original LEVERAGE spec by section number (§5.4, §6.2, §9, etc.). The original spec is not inlined here — it lives in the user's session context and paste buffer. When a future reader or reviewer needs to resolve a reference, pull from the original paste. Critical sections (§5.4 ingest flow, `BRIEFING_PROMPT`, success criteria) are reproduced in this doc where they drive decisions.
 
 ## Success Criteria
 
@@ -200,7 +255,7 @@ Hackathon submission, no user distribution required. Deployment targets:
 
 1. Create `leverage` repo on GitHub. Scaffold Next.js 15 frontend + Python FastAPI backend + seeder folder per structure above.
 2. Sign up for Hindsight Cloud, apply MEMHACK409 promo, verify API key works with a trivial `client.retain()` + `client.reflect()` round-trip.
-3. Start `vendor_data.py`. Allot 2.5 hrs. Get the NexaCloud 23 interactions right — they're the demo centerpiece. DataPipe and SecureNet can use more Faker filler.
+3. Start `vendor_data.py`. Allot 2.5 hrs. **30 interactions total: 23 NexaCloud + 4 DataPipe + 3 SecureNet.** 9 of the 23 NexaCloud records directly support the 4 on-screen tactics; the remaining 14 are Hindsight context. DataPipe and SecureNet exist to populate dashboard cards only — their briefings do not need to be demo-quality and can lean heavily on Faker.
 4. Build backend in this order: `briefing.py` → `nomemory.py` → `ingest.py`. Curl-test each before touching frontend.
 5. Build frontend in this order: `api.ts` → Dashboard → Briefing with toggle + CascadeStatus → PostCallForm + ScoreDiff.
 6. Deploy at hour 8. Record backup video at hour 8. Rehearse at hour 9.
