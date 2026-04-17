@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
@@ -11,6 +11,7 @@ from briefing import build_briefing, _days_remaining
 from nomemory import build_nomemory
 from ingest import run_ingest
 from pipeline import set_hindsight_client
+from call_coach import run_call_coach
 
 app = FastAPI(title="LEVERAGE")
 
@@ -52,7 +53,7 @@ def list_vendors():
             days_remaining=_days_remaining(meta["renewal_date"]),
             contact=meta["contact"],
             interaction_count=meta["interaction_count"],
-            tactic_count=4 if bank_id == "nexacloud" else 2,
+            tactic_count=meta["tactic_count"],
         ))
     return VendorListResponse(vendors=vendors)
 
@@ -78,3 +79,12 @@ async def post_ingest(req: IngestRequest):
     if _hindsight is None:
         raise HTTPException(503, "Hindsight client not available")
     return await run_ingest(req, VENDOR_META[req.vendor], _hindsight)
+
+
+@app.websocket("/ws/call/{vendor}")
+async def call_websocket(websocket: WebSocket, vendor: str):
+    if vendor not in VENDOR_META:
+        await websocket.close(code=4004)
+        return
+    briefing = await build_briefing(vendor, VENDOR_META[vendor])
+    await run_call_coach(websocket, briefing)
