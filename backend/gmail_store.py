@@ -16,8 +16,8 @@ AUTH_SCOPES = [
 ]
 CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/gmail/callback")
-AUTH_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/gmail/callback")
+REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://set-daring-tadpole.ngrok-free.app/api/gmail/callback")
+AUTH_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://set-daring-tadpole.ngrok-free.app/api/gmail/callback")
 
 # Keyed by state — holds the flow between auth-url and callback
 _pending_flows: dict[str, Flow] = {}

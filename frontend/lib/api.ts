@@ -1,9 +1,19 @@
 import type {
-  Briefing, Vendor, NoMemoryResponse, IngestRequest, IngestResponse,
-  CallRecord, EmailThread, VendorCreateRequest, VendorAnalytics, PortfolioAnalytics,
+  Briefing,
+  Vendor,
+  NoMemoryResponse,
+  IngestRequest,
+  IngestResponse,
+  CallRecord,
+  EmailThread,
+  VendorCreateRequest,
+  VendorAnalytics,
+  PortfolioAnalytics,
 } from "./types";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "https://set-daring-tadpole.ngrok-free.app";
 
 async function j<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, cache: "no-store" });
@@ -49,9 +59,12 @@ export const api = {
   // ---------------------------------------------------------------------------
   // Briefing
   // ---------------------------------------------------------------------------
-  briefing: (vendor: string) => j<Briefing>(`${BASE}/api/briefing?vendor=${vendor}`),
+  briefing: (vendor: string) =>
+    j<Briefing>(`${BASE}/api/briefing?vendor=${vendor}`),
   nomemory: (vendor: string) =>
-    j<NoMemoryResponse>(`${BASE}/api/briefing/nomemory?vendor=${vendor}`, { method: "POST" }),
+    j<NoMemoryResponse>(`${BASE}/api/briefing/nomemory?vendor=${vendor}`, {
+      method: "POST",
+    }),
   ingest: (req: IngestRequest) =>
     j<IngestResponse>(`${BASE}/api/ingest`, {
       method: "POST",
@@ -110,7 +123,7 @@ export const api = {
     emails: (vendor: string, contactEmail: string) =>
       j<{ emails: EmailThread[] }>(
         `${BASE}/api/gmail/emails/${vendor}?contact_email=${encodeURIComponent(contactEmail)}`,
-        { headers: authHeader() }
+        { headers: authHeader() },
       ),
   },
 };

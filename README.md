@@ -66,18 +66,18 @@ Click "Log post-call notes." Type the Priya note. Submit. Pipeline flashes again
 
 ## Stack
 
-| Layer | Tech | Notes |
-|---|---|---|
-| Frontend | Next.js 15 (App Router) + TypeScript | React 18, TS 5.x, deployed on Vercel |
-| Styling | Tailwind CSS v3.4 | Desktop-only (1024px+) |
-| Charts | Recharts v2.10 | Anti-pattern sparkline + confidence evolution (P1) |
-| Backend | Python 3.11 + FastAPI 0.109 | Deployed on Railway |
-| Orchestration | OpenAI Agents SDK (`openai-agents`) | `BriefingAgent` with 3 tools; `RunHooks` for ms-accurate timings |
-| Memory | Hindsight Cloud (`hindsight-client`) | 3 vendor banks; recall → synthesize → rank |
-| LLM | OpenAI gpt-4o | `gpt-4o-mini` fallback via `OPENAI_MODEL` env var |
-| Data gen | Faker v22.0 | Seeder only — critical turning points are hand-authored |
-| Frontend host | Vercel | Free tier, auto-deploy from `main` |
-| Backend host | Railway | Free tier, Dockerfile deploy |
+| Layer         | Tech                                 | Notes                                                            |
+| ------------- | ------------------------------------ | ---------------------------------------------------------------- |
+| Frontend      | Next.js 15 (App Router) + TypeScript | React 18, TS 5.x, deployed on Vercel                             |
+| Styling       | Tailwind CSS v3.4                    | Desktop-only (1024px+)                                           |
+| Charts        | Recharts v2.10                       | Anti-pattern sparkline + confidence evolution (P1)               |
+| Backend       | Python 3.11 + FastAPI 0.109          | Deployed on Railway                                              |
+| Orchestration | OpenAI Agents SDK (`openai-agents`)  | `BriefingAgent` with 3 tools; `RunHooks` for ms-accurate timings |
+| Memory        | Hindsight Cloud (`hindsight-client`) | 3 vendor banks; recall → synthesize → rank                       |
+| LLM           | OpenAI gpt-4o                        | `gpt-4o-mini` fallback via `OPENAI_MODEL` env var                |
+| Data gen      | Faker v22.0                          | Seeder only — critical turning points are hand-authored          |
+| Frontend host | Vercel                               | Free tier, auto-deploy from `main`                               |
+| Backend host  | Railway                              | Free tier, Dockerfile deploy                                     |
 
 ---
 
@@ -100,6 +100,7 @@ Click "Log post-call notes." Type the Priya note. Submit. Pipeline flashes again
 ### Post-call ingest (memory compounds)
 
 `POST /api/ingest` runs a 4-step pipeline:
+
 1. **capture_old_scores** — snapshot current tactic confidences via `BriefingAgent`.
 2. **retain** — `client.retain(bank_id, experience, metadata)` writes the new interaction to Hindsight.
 3. **reflect** — re-run `BriefingAgent` on the updated bank; re-synthesize tactics.
@@ -130,12 +131,12 @@ cd ../backend
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
-# Verify: curl http://localhost:8000/health
+# Verify: curl https://set-daring-tadpole.ngrok-free.app/health
 
 # 4. Frontend
 cd ../frontend
 pnpm install
-echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+echo "NEXT_PUBLIC_API_URL=https://set-daring-tadpole.ngrok-free.app" > .env.local
 pnpm dev
 # Open http://localhost:3000
 ```
@@ -143,6 +144,7 @@ pnpm dev
 ### Environment variables
 
 **Backend (`backend/.env`):**
+
 ```
 HINDSIGHT_API_URL=https://api.hindsight.vectorize.io
 HINDSIGHT_API_KEY=...
@@ -153,8 +155,9 @@ CORS_ORIGINS=http://localhost:3000,https://<your-vercel-app>.vercel.app
 ```
 
 **Frontend (`frontend/.env.local`):**
+
 ```
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=https://set-daring-tadpole.ngrok-free.app
 ```
 
 ---
@@ -177,6 +180,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ### CORS
 
 After both are deployed, update `CORS_ORIGINS` on Railway to include your Vercel domain:
+
 ```
 CORS_ORIGINS=https://<your-vercel-app>.vercel.app
 ```
@@ -203,11 +207,11 @@ Smoke-test the full flow from the deployed Vercel URL (not localhost) before the
 
 ## Vendors Seeded
 
-| Vendor | Annual Value | Renewal | Contact | Interactions |
-|--------|-------------|---------|---------|-------------|
-| NexaCloud | $380,000 | Dec 31 | Marcus Chen | 23 |
-| DataPipe | $120,000 | Mar 15 | Ananya Rao | 4 |
-| SecureNet | $85,000 | Jul 1 | James Wu | 3 |
+| Vendor    | Annual Value | Renewal | Contact     | Interactions |
+| --------- | ------------ | ------- | ----------- | ------------ |
+| NexaCloud | $380,000     | Dec 31  | Marcus Chen | 23           |
+| DataPipe  | $120,000     | Mar 15  | Ananya Rao  | 4            |
+| SecureNet | $85,000      | Jul 1   | James Wu    | 3            |
 
 NexaCloud is the primary demo vendor — 23 hand-authored interactions support all four on-screen tactics with dated evidence. DataPipe and SecureNet are present to demonstrate the dashboard is not a one-vendor mock.
 

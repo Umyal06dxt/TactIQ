@@ -1,4 +1,6 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "https://set-daring-tadpole.ngrok-free.app";
 const TOKEN_KEY = "leverage_token";
 
 export type User = { id: string; email: string; full_name: string | null };
@@ -23,9 +25,14 @@ export async function fetchMe(): Promise<User | null> {
     const res = await fetch(`${BASE}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) { clearToken(); return null; }
+    if (!res.ok) {
+      clearToken();
+      return null;
+    }
     return res.json();
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export async function login(email: string, password: string): Promise<User> {
@@ -40,7 +47,11 @@ export async function login(email: string, password: string): Promise<User> {
   return { id: data.user_id, email: data.email, full_name: null };
 }
 
-export async function signup(email: string, password: string, fullName: string): Promise<User> {
+export async function signup(
+  email: string,
+  password: string,
+  fullName: string,
+): Promise<User> {
   const res = await fetch(`${BASE}/api/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

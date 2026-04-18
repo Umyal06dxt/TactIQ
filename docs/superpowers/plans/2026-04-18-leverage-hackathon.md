@@ -17,6 +17,7 @@
 ## Pragmatism note (hackathon mode)
 
 TDD discipline is relaxed for UI glue code — 10 hours is the whole budget. TDD is **enforced** for the two pieces of logic that must be correct:
+
 1. The confidence formula (`briefing.confidence`)
 2. The score-diff computation (`ingest.compute_diffs`)
 
@@ -27,45 +28,48 @@ Everything else verifies via curl, browser smoke-test, and the acceptance checkl
 ## File Structure (decomposed from spec.md §3.2)
 
 ### Backend (`backend/`)
-| File | Responsibility |
-|------|----------------|
-| `main.py` | FastAPI app, CORS config, route wiring, `/health` |
-| `prompts.py` | `BRIEFING_PROMPT` + `NOMEMORY_PROMPT` + `AGENT_INSTRUCTIONS` string constants |
-| `models.py` | Pydantic request/response schemas |
-| `pipeline.py` | OpenAI Agents SDK: `BriefingAgent`, function tools (`recall_memories`, `synthesize_briefing`, `rank_tactics`), `PipelineHooks(RunHooks)`, and async `run_briefing()` entry point |
-| `briefing.py` | Confidence formula + `_days_remaining` helper + thin async `build_briefing()` adapter wrapping `pipeline.run_briefing` |
-| `nomemory.py` | OpenAI-only generic-advice endpoint handler |
-| `ingest.py` | §5.4 four-step flow (capture_old → retain → reflect → diff) |
-| `fixtures/demo.json` | DEMO_MODE canned responses for every route |
-| `requirements.txt` | Pinned deps |
-| `Dockerfile` | Railway build |
-| `tests/test_confidence.py` | Unit tests for confidence formula |
-| `tests/test_diffs.py` | Unit tests for diff computation |
+
+| File                       | Responsibility                                                                                                                                                                   |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main.py`                  | FastAPI app, CORS config, route wiring, `/health`                                                                                                                                |
+| `prompts.py`               | `BRIEFING_PROMPT` + `NOMEMORY_PROMPT` + `AGENT_INSTRUCTIONS` string constants                                                                                                    |
+| `models.py`                | Pydantic request/response schemas                                                                                                                                                |
+| `pipeline.py`              | OpenAI Agents SDK: `BriefingAgent`, function tools (`recall_memories`, `synthesize_briefing`, `rank_tactics`), `PipelineHooks(RunHooks)`, and async `run_briefing()` entry point |
+| `briefing.py`              | Confidence formula + `_days_remaining` helper + thin async `build_briefing()` adapter wrapping `pipeline.run_briefing`                                                           |
+| `nomemory.py`              | OpenAI-only generic-advice endpoint handler                                                                                                                                      |
+| `ingest.py`                | §5.4 four-step flow (capture_old → retain → reflect → diff)                                                                                                                      |
+| `fixtures/demo.json`       | DEMO_MODE canned responses for every route                                                                                                                                       |
+| `requirements.txt`         | Pinned deps                                                                                                                                                                      |
+| `Dockerfile`               | Railway build                                                                                                                                                                    |
+| `tests/test_confidence.py` | Unit tests for confidence formula                                                                                                                                                |
+| `tests/test_diffs.py`      | Unit tests for diff computation                                                                                                                                                  |
 
 ### Frontend (`frontend/src/`)
-| File | Responsibility |
-|------|----------------|
-| `app/layout.tsx` | Root layout + Tailwind import |
-| `app/page.tsx` | Dashboard page |
-| `app/briefing/[vendor]/page.tsx` | Briefing page (server component wrapping the client briefing) |
-| `app/briefing/[vendor]/BriefingClient.tsx` | Client component that owns toggle + fetch state |
-| `lib/api.ts` | Typed fetch client against backend |
-| `lib/types.ts` | Shared TS types (Tactic, Briefing, ScoreDiff, PipelineStep) — mirrors `backend/models.py` |
-| `components/VendorCard.tsx` | Dashboard card |
-| `components/TacticCard.tsx` | Tactic with 5-dot confidence, evidence, timing |
-| `components/Playbook.tsx` | Branching decision tree |
-| `components/AntiPatternSparkline.tsx` | Descending red SVG sparkline |
-| `components/MemoryToggle.tsx` | Hero toggle component |
-| `components/PipelineStatus.tsx` | Agents-SDK orchestration step trail (dark pill with live timings) |
-| `components/SignalFeed.tsx` | 2-item signals feed |
-| `components/PostCallForm.tsx` | Modal form for logging post-call notes |
-| `components/ScoreDiff.tsx` | Animated old → new display |
+
+| File                                       | Responsibility                                                                            |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `app/layout.tsx`                           | Root layout + Tailwind import                                                             |
+| `app/page.tsx`                             | Dashboard page                                                                            |
+| `app/briefing/[vendor]/page.tsx`           | Briefing page (server component wrapping the client briefing)                             |
+| `app/briefing/[vendor]/BriefingClient.tsx` | Client component that owns toggle + fetch state                                           |
+| `lib/api.ts`                               | Typed fetch client against backend                                                        |
+| `lib/types.ts`                             | Shared TS types (Tactic, Briefing, ScoreDiff, PipelineStep) — mirrors `backend/models.py` |
+| `components/VendorCard.tsx`                | Dashboard card                                                                            |
+| `components/TacticCard.tsx`                | Tactic with 5-dot confidence, evidence, timing                                            |
+| `components/Playbook.tsx`                  | Branching decision tree                                                                   |
+| `components/AntiPatternSparkline.tsx`      | Descending red SVG sparkline                                                              |
+| `components/MemoryToggle.tsx`              | Hero toggle component                                                                     |
+| `components/PipelineStatus.tsx`            | Agents-SDK orchestration step trail (dark pill with live timings)                         |
+| `components/SignalFeed.tsx`                | 2-item signals feed                                                                       |
+| `components/PostCallForm.tsx`              | Modal form for logging post-call notes                                                    |
+| `components/ScoreDiff.tsx`                 | Animated old → new display                                                                |
 
 ### Seeder (`seeder/`)
-| File | Responsibility |
-|------|----------------|
-| `vendor_data.py` | Pure-Python dict of 30 interactions (23 NexaCloud + 4 DataPipe + 3 SecureNet) |
-| `seed_vendors.py` | Batch writer that calls `client.retain()` for each interaction |
+
+| File              | Responsibility                                                                |
+| ----------------- | ----------------------------------------------------------------------------- |
+| `vendor_data.py`  | Pure-Python dict of 30 interactions (23 NexaCloud + 4 DataPipe + 3 SecureNet) |
+| `seed_vendors.py` | Batch writer that calls `client.retain()` for each interaction                |
 
 ---
 
@@ -134,6 +138,7 @@ Expected: hooks fire (`[start] add`, `[end] add -> 5`), final output contains "5
 ### Task P2: Repo + scaffolds
 
 **Files:**
+
 - Create: `leverage/` GitHub repo (public, MIT)
 - Create: `frontend/` via `create-next-app`
 - Create: `backend/` FastAPI scaffold
@@ -205,7 +210,7 @@ def health():
 ```bash
 cd backend && uvicorn main:app --reload --port 8000
 # In another terminal:
-curl http://localhost:8000/health
+curl https://set-daring-tadpole.ngrok-free.app/health
 ```
 
 Expected: `{"ok":true}`.
@@ -219,7 +224,7 @@ OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o
 DEMO_MODE=false
 CORS_ORIGINS=http://localhost:3000
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=https://set-daring-tadpole.ngrok-free.app
 ```
 
 (The Agents SDK reads `OPENAI_API_KEY` from the environment. No extra keys needed.)
@@ -293,6 +298,7 @@ Expected: 30 successful `retain()` calls. Leave overnight for Hindsight synthesi
 ### Task B1: Vendor data fixture
 
 **Files:**
+
 - Create: `seeder/vendor_data.py`
 - Create: `seeder/__init__.py` (empty)
 
@@ -401,6 +407,7 @@ git add seeder/ && git commit -m "feat(seeder): add vendor data fixtures (30 int
 ### Task B2: Seeder script
 
 **Files:**
+
 - Create: `seeder/seed_vendors.py`
 
 - [ ] **Step 1: Write `seeder/seed_vendors.py`:**
@@ -490,6 +497,7 @@ git add seeder/seed_vendors.py && git commit -m "feat(seeder): batch writer for 
 ### Task B3: Prompts module
 
 **Files:**
+
 - Create: `backend/prompts.py`
 
 - [ ] **Step 1: Write `backend/prompts.py`** exactly as specified in `spec.md §5.3`:
@@ -564,6 +572,7 @@ git add backend/prompts.py && git commit -m "feat(backend): briefing + nomemory 
 ### Task B4: Pydantic models
 
 **Files:**
+
 - Create: `backend/models.py`
 
 - [ ] **Step 1: Write `backend/models.py`:**
@@ -684,6 +693,7 @@ git add backend/models.py && git commit -m "feat(backend): Pydantic schemas"
 ### Task B5: Agents SDK pipeline (`pipeline.py`)
 
 **Files:**
+
 - Create: `backend/pipeline.py`
 
 This module defines the `BriefingAgent` + its three function tools, the `PipelineHooks` class that captures tool-call timings, and `run_briefing()` — the async entry point used by both `/api/briefing` and `/api/ingest`.
@@ -876,6 +886,7 @@ git add backend/pipeline.py && git commit -m "feat(backend): Agents SDK Briefing
 ### Task B6: Briefing module (with TDD on confidence formula)
 
 **Files:**
+
 - Create: `backend/briefing.py`
 - Create: `backend/tests/__init__.py` (empty)
 - Create: `backend/tests/test_confidence.py`
@@ -976,7 +987,7 @@ Expected: all 6 tests PASS. (The formula doesn't touch the pipeline — these te
 ```bash
 cd backend && uvicorn main:app --reload --port 8000 &
 sleep 2
-curl "http://localhost:8000/api/briefing?vendor=nexacloud" | python -m json.tool | head -60
+curl "https://set-daring-tadpole.ngrok-free.app/api/briefing?vendor=nexacloud" | python -m json.tool | head -60
 ```
 
 Expected: JSON with ≥4 tactics, `pipeline_trail` containing `recall_memories`, `synthesize_briefing`, `rank_tactics` steps with non-zero ms.
@@ -992,6 +1003,7 @@ git add backend/briefing.py backend/tests/ && git commit -m "feat(backend): brie
 ### Task B7: Nomemory module
 
 **Files:**
+
 - Create: `backend/nomemory.py`
 
 - [ ] **Step 1: Write `backend/nomemory.py`:**
@@ -1033,6 +1045,7 @@ git add backend/nomemory.py && git commit -m "feat(backend): nomemory OpenAI end
 ### Task B8: Wire routes + vendors metadata + curl smoke test
 
 **Files:**
+
 - Modify: `backend/main.py`
 - Create: `backend/vendors_meta.py` (thin wrapper around seeder/vendor_data for the backend)
 
@@ -1125,7 +1138,7 @@ async def post_ingest(req: IngestRequest):
 ```bash
 cd backend && uvicorn main:app --reload --port 8000 &
 sleep 2
-curl http://localhost:8000/api/vendors | python -m json.tool
+curl https://set-daring-tadpole.ngrok-free.app/api/vendors | python -m json.tool
 ```
 
 Expected: 3 vendors with `days_remaining` computed.
@@ -1133,7 +1146,7 @@ Expected: 3 vendors with `days_remaining` computed.
 - [ ] **Step 4: Curl-test briefing endpoint (requires Hindsight to have synthesized):**
 
 ```bash
-curl "http://localhost:8000/api/briefing?vendor=nexacloud" | python -m json.tool
+curl "https://set-daring-tadpole.ngrok-free.app/api/briefing?vendor=nexacloud" | python -m json.tool
 ```
 
 Expected: full Briefing JSON with ≥4 tactics, populated `pipeline_trail`, anti-pattern present.
@@ -1141,7 +1154,7 @@ Expected: full Briefing JSON with ≥4 tactics, populated `pipeline_trail`, anti
 - [ ] **Step 5: Curl-test nomemory endpoint:**
 
 ```bash
-curl -X POST "http://localhost:8000/api/briefing/nomemory?vendor=nexacloud" | python -m json.tool
+curl -X POST "https://set-daring-tadpole.ngrok-free.app/api/briefing/nomemory?vendor=nexacloud" | python -m json.tool
 ```
 
 Expected: 3 generic tactics, no dates or dollar amounts.
@@ -1161,6 +1174,7 @@ git add backend/ && git commit -m "feat(backend): wire /api/vendors, /api/briefi
 ### Task B9: Ingest module with TDD on diff computation
 
 **Files:**
+
 - Create: `backend/ingest.py`
 - Create: `backend/tests/test_diffs.py`
 
@@ -1312,7 +1326,7 @@ Expected: all tests PASS (6 confidence + 6 diff = 12).
 - [ ] **Step 5: Uncomment the `/api/ingest` route in `main.py`** if it was stubbed in B8. Curl-test the full ingest:
 
 ```bash
-curl -X POST http://localhost:8000/api/ingest \
+curl -X POST https://set-daring-tadpole.ngrok-free.app/api/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "vendor": "nexacloud",
@@ -1339,6 +1353,7 @@ git add backend/ingest.py backend/tests/test_diffs.py && git commit -m "feat(bac
 ### Task F1: Shared types + API client
 
 **Files:**
+
 - Create: `frontend/src/lib/types.ts`
 - Create: `frontend/src/lib/api.ts`
 
@@ -1381,11 +1396,21 @@ export type PipelineStep = {
 
 export type Briefing = {
   vendor: string;
-  contract: { value: number; renewal_date: string; days_remaining: number; contact: string };
+  contract: {
+    value: number;
+    renewal_date: string;
+    days_remaining: number;
+    contact: string;
+  };
   tactics: Tactic[];
   playbook: Playbook;
   temporal_signals: { label: string; severity: "low" | "medium" | "high" }[];
-  recent_signals: { date: string; source: string; summary: string; interpretation: string }[];
+  recent_signals: {
+    date: string;
+    source: string;
+    summary: string;
+    interpretation: string;
+  }[];
   pipeline_trail: PipelineStep[];
 };
 
@@ -1421,7 +1446,11 @@ export type NoMemoryResponse = {
 export type IngestRequest = {
   vendor: string;
   notes: string;
-  outcome: "Successful concession" | "No movement" | "Escalated" | "Rescheduled";
+  outcome:
+    | "Successful concession"
+    | "No movement"
+    | "Escalated"
+    | "Rescheduled";
   timestamp: string;
 };
 ```
@@ -1429,9 +1458,17 @@ export type IngestRequest = {
 - [ ] **Step 2: Write `frontend/src/lib/api.ts`:**
 
 ```typescript
-import type { Briefing, Vendor, NoMemoryResponse, IngestRequest, IngestResponse } from "./types";
+import type {
+  Briefing,
+  Vendor,
+  NoMemoryResponse,
+  IngestRequest,
+  IngestResponse,
+} from "./types";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "https://set-daring-tadpole.ngrok-free.app";
 
 async function j<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, cache: "no-store" });
@@ -1444,9 +1481,12 @@ async function j<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   vendors: () => j<{ vendors: Vendor[] }>(`${BASE}/api/vendors`),
-  briefing: (vendor: string) => j<Briefing>(`${BASE}/api/briefing?vendor=${vendor}`),
+  briefing: (vendor: string) =>
+    j<Briefing>(`${BASE}/api/briefing?vendor=${vendor}`),
   nomemory: (vendor: string) =>
-    j<NoMemoryResponse>(`${BASE}/api/briefing/nomemory?vendor=${vendor}`, { method: "POST" }),
+    j<NoMemoryResponse>(`${BASE}/api/briefing/nomemory?vendor=${vendor}`, {
+      method: "POST",
+    }),
   ingest: (req: IngestRequest) =>
     j<IngestResponse>(`${BASE}/api/ingest`, {
       method: "POST",
@@ -1467,6 +1507,7 @@ git add frontend/src/lib && git commit -m "feat(frontend): typed API client + sh
 ### Task F2: Dashboard page
 
 **Files:**
+
 - Create: `frontend/src/components/VendorCard.tsx`
 - Modify: `frontend/src/app/page.tsx`
 
@@ -1488,7 +1529,8 @@ export function VendorCard({ v }: { v: Vendor }) {
         <span className="text-sm text-neutral-500">{v.contact}</span>
       </div>
       <div className="mt-4 text-3xl font-bold tracking-tight">
-        ${v.annual_value.toLocaleString()}<span className="text-base font-medium text-neutral-500">/yr</span>
+        ${v.annual_value.toLocaleString()}
+        <span className="text-base font-medium text-neutral-500">/yr</span>
       </div>
       <div className="mt-4 flex gap-4 text-sm text-neutral-600">
         <span>{v.interaction_count} interactions</span>
@@ -1522,7 +1564,9 @@ export default async function Dashboard() {
     <main className="mx-auto max-w-5xl px-6 py-12">
       <header className="mb-10">
         <h1 className="text-4xl font-bold tracking-tight">LEVERAGE</h1>
-        <p className="mt-2 text-neutral-600">Negotiation memory for procurement.</p>
+        <p className="mt-2 text-neutral-600">
+          Negotiation memory for procurement.
+        </p>
       </header>
       {vendors.length === 0 ? (
         <div className="rounded-xl bg-amber-50 p-6 text-amber-900">
@@ -1564,6 +1608,7 @@ git add frontend/src/app/page.tsx frontend/src/components/VendorCard.tsx && git 
 ### Task F3: Briefing page shell (server + client split)
 
 **Files:**
+
 - Create: `frontend/src/app/briefing/[vendor]/page.tsx`
 - Create: `frontend/src/app/briefing/[vendor]/BriefingClient.tsx`
 
@@ -1577,7 +1622,11 @@ import { BriefingClient } from "./BriefingClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function BriefingPage({ params }: { params: { vendor: string } }) {
+export default async function BriefingPage({
+  params,
+}: {
+  params: { vendor: string };
+}) {
   const initial = await api.briefing(params.vendor);
   return <BriefingClient vendor={params.vendor} initial={initial} />;
 }
@@ -1601,7 +1650,13 @@ import { SignalFeed } from "@/components/SignalFeed";
 import { PostCallForm } from "@/components/PostCallForm";
 import { ScoreDiff as ScoreDiffPanel } from "@/components/ScoreDiff";
 
-export function BriefingClient({ vendor, initial }: { vendor: string; initial: Briefing }) {
+export function BriefingClient({
+  vendor,
+  initial,
+}: {
+  vendor: string;
+  initial: Briefing;
+}) {
   const [memoryOn, setMemoryOn] = useState(true);
   const [briefing, setBriefing] = useState<Briefing>(initial);
   const [nomem, setNomem] = useState<NoMemoryResponse | null>(null);
@@ -1609,31 +1664,37 @@ export function BriefingClient({ vendor, initial }: { vendor: string; initial: B
   const [diffs, setDiffs] = useState<Record<string, ScoreDiff> | null>(null);
   const [flashTactics, setFlashTactics] = useState<Set<string>>(new Set());
 
-  const toggleMemory = useCallback(async (next: boolean) => {
-    setMemoryOn(next);
-    if (next) {
-      const b = await api.briefing(vendor);
-      setBriefing(b);
-      setNomem(null);
-    } else {
-      const n = await api.nomemory(vendor);
-      setNomem(n);
-    }
-  }, [vendor]);
+  const toggleMemory = useCallback(
+    async (next: boolean) => {
+      setMemoryOn(next);
+      if (next) {
+        const b = await api.briefing(vendor);
+        setBriefing(b);
+        setNomem(null);
+      } else {
+        const n = await api.nomemory(vendor);
+        setNomem(n);
+      }
+    },
+    [vendor],
+  );
 
-  const onSubmitLog = useCallback(async (notes: string, outcome: string) => {
-    const res = await api.ingest({
-      vendor,
-      notes,
-      outcome: outcome as any,
-      timestamp: new Date().toISOString(),
-    });
-    setBriefing(res.briefing);
-    setDiffs(res.score_diffs);
-    setFlashTactics(new Set(Object.keys(res.score_diffs)));
-    setShowForm(false);
-    setTimeout(() => setFlashTactics(new Set()), 1200);
-  }, [vendor]);
+  const onSubmitLog = useCallback(
+    async (notes: string, outcome: string) => {
+      const res = await api.ingest({
+        vendor,
+        notes,
+        outcome: outcome as any,
+        timestamp: new Date().toISOString(),
+      });
+      setBriefing(res.briefing);
+      setDiffs(res.score_diffs);
+      setFlashTactics(new Set(Object.keys(res.score_diffs)));
+      setShowForm(false);
+      setTimeout(() => setFlashTactics(new Set()), 1200);
+    },
+    [vendor],
+  );
 
   const antiPattern = briefing.tactics.find((t) => t.is_anti_pattern);
 
@@ -1644,8 +1705,12 @@ export function BriefingClient({ vendor, initial }: { vendor: string; initial: B
         <div>
           <h1 className="text-3xl font-bold">{vendor.toUpperCase()}</h1>
           <p className="text-neutral-600">
-            Contact {briefing.contract.contact} · ${briefing.contract.value.toLocaleString()}/yr ·
-            Renewal {briefing.contract.renewal_date} · <span className="text-red-700 font-medium">{briefing.contract.days_remaining} days</span>
+            Contact {briefing.contract.contact} · $
+            {briefing.contract.value.toLocaleString()}/yr · Renewal{" "}
+            {briefing.contract.renewal_date} ·{" "}
+            <span className="text-red-700 font-medium">
+              {briefing.contract.days_remaining} days
+            </span>
           </p>
         </div>
         <MemoryToggle value={memoryOn} onChange={toggleMemory} />
@@ -1656,9 +1721,19 @@ export function BriefingClient({ vendor, initial }: { vendor: string; initial: B
       {memoryOn ? (
         <div className="space-y-8">
           <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {briefing.tactics.filter((t) => !t.is_anti_pattern).map((t) => (
-              <TacticCard key={t.name} tactic={t} flash={flashTactics.has(t.name) ? (diffs?.[t.name]?.direction ?? null) : null} />
-            ))}
+            {briefing.tactics
+              .filter((t) => !t.is_anti_pattern)
+              .map((t) => (
+                <TacticCard
+                  key={t.name}
+                  tactic={t}
+                  flash={
+                    flashTactics.has(t.name)
+                      ? (diffs?.[t.name]?.direction ?? null)
+                      : null
+                  }
+                />
+              ))}
           </section>
           <Playbook playbook={briefing.playbook} flashRefs={flashTactics} />
           {antiPattern && <AntiPatternSparkline tactic={antiPattern} />}
@@ -1674,21 +1749,31 @@ export function BriefingClient({ vendor, initial }: { vendor: string; initial: B
         </div>
       ) : nomem ? (
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-neutral-500">Generic advice (no memory)</h2>
+          <h2 className="text-lg font-semibold text-neutral-500">
+            Generic advice (no memory)
+          </h2>
           {nomem.tactics.map((t) => (
-            <div key={t.name} className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-4">
+            <div
+              key={t.name}
+              className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-4"
+            >
               <div className="font-medium">{t.name}</div>
               <div className="text-sm text-neutral-600">{t.advice}</div>
             </div>
           ))}
-          <div className="text-sm italic text-neutral-500">— no playbook without memory —</div>
+          <div className="text-sm italic text-neutral-500">
+            — no playbook without memory —
+          </div>
         </section>
       ) : (
         <div>Loading…</div>
       )}
 
       {showForm && (
-        <PostCallForm onClose={() => setShowForm(false)} onSubmit={onSubmitLog} />
+        <PostCallForm
+          onClose={() => setShowForm(false)}
+          onSubmit={onSubmitLog}
+        />
       )}
 
       {diffs && Object.keys(diffs).length > 0 && (
@@ -1712,6 +1797,7 @@ git add frontend/src/app/briefing && git commit -m "feat(frontend): briefing pag
 ### Task F4: MemoryToggle (hero component)
 
 **Files:**
+
 - Create: `frontend/src/components/MemoryToggle.tsx`
 
 - [ ] **Step 1: Write the component:**
@@ -1719,10 +1805,18 @@ git add frontend/src/app/briefing && git commit -m "feat(frontend): briefing pag
 ```tsx
 "use client";
 
-export function MemoryToggle({ value, onChange }: { value: boolean; onChange: (next: boolean) => void }) {
+export function MemoryToggle({
+  value,
+  onChange,
+}: {
+  value: boolean;
+  onChange: (next: boolean) => void;
+}) {
   return (
     <label className="flex cursor-pointer items-center gap-3">
-      <span className={`text-sm font-semibold ${value ? "text-emerald-700" : "text-neutral-500"}`}>
+      <span
+        className={`text-sm font-semibold ${value ? "text-emerald-700" : "text-neutral-500"}`}
+      >
         Memory {value ? "ON" : "OFF"}
       </span>
       <button
@@ -1751,6 +1845,7 @@ git add frontend/src/components/MemoryToggle.tsx && git commit -m "feat(frontend
 ### Task F5: PipelineStatus trail
 
 **Files:**
+
 - Create: `frontend/src/components/PipelineStatus.tsx`
 
 - [ ] **Step 1: Write the component:**
@@ -1763,15 +1858,27 @@ export function PipelineStatus({ trail }: { trail: PipelineStep[] }) {
   if (!trail?.length) return null;
   return (
     <div className="mb-8 rounded-lg border border-neutral-200 bg-neutral-900 p-4 font-mono text-sm text-neutral-100">
-      <div className="mb-2 text-xs uppercase tracking-widest text-neutral-400">Agents SDK Pipeline</div>
+      <div className="mb-2 text-xs uppercase tracking-widest text-neutral-400">
+        Agents SDK Pipeline
+      </div>
       {trail.map((s, i) => (
         <div key={i} className="flex items-center gap-3">
-          <span className={s.status === "ok" ? "text-emerald-400" : s.status === "error" ? "text-red-400" : "text-neutral-500"}>
+          <span
+            className={
+              s.status === "ok"
+                ? "text-emerald-400"
+                : s.status === "error"
+                  ? "text-red-400"
+                  : "text-neutral-500"
+            }
+          >
             {s.status === "ok" ? "✓" : s.status === "error" ? "✗" : "·"}
           </span>
           <span className="text-neutral-200">{s.step}</span>
           {s.label && <span className="text-neutral-400">— {s.label}</span>}
-          <span className="ml-auto tabular-nums text-neutral-400">{s.ms} ms</span>
+          <span className="ml-auto tabular-nums text-neutral-400">
+            {s.ms} ms
+          </span>
         </div>
       ))}
     </div>
@@ -1790,6 +1897,7 @@ git add frontend/src/components/PipelineStatus.tsx && git commit -m "feat(fronte
 ### Task F6: TacticCard + Playbook + AntiPatternSparkline + SignalFeed
 
 **Files:**
+
 - Create: `frontend/src/components/TacticCard.tsx`
 - Create: `frontend/src/components/Playbook.tsx`
 - Create: `frontend/src/components/AntiPatternSparkline.tsx`
@@ -1808,11 +1916,20 @@ function dotColor(c: number, anti: boolean) {
   return "bg-neutral-400";
 }
 
-export function TacticCard({ tactic: t, flash }: { tactic: Tactic; flash: "up" | "down" | null }) {
+export function TacticCard({
+  tactic: t,
+  flash,
+}: {
+  tactic: Tactic;
+  flash: "up" | "down" | null;
+}) {
   const filled = Math.round(t.confidence * 5);
   const flashBg =
-    flash === "up" ? "ring-2 ring-emerald-400 bg-emerald-50" :
-    flash === "down" ? "ring-2 ring-red-400 bg-red-50" : "";
+    flash === "up"
+      ? "ring-2 ring-emerald-400 bg-emerald-50"
+      : flash === "down"
+        ? "ring-2 ring-red-400 bg-red-50"
+        : "";
   return (
     <div
       className={`rounded-xl border p-5 transition-all duration-500 ${t.is_anti_pattern ? "border-red-500 bg-red-50" : "border-neutral-200 bg-white"} ${flashBg}`}
@@ -1820,15 +1937,24 @@ export function TacticCard({ tactic: t, flash }: { tactic: Tactic; flash: "up" |
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">{t.name}</h3>
         {t.is_anti_pattern && (
-          <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold text-white">AVOID</span>
+          <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+            AVOID
+          </span>
         )}
       </div>
       <div className="mt-2 flex items-center gap-1">
         {Array.from({ length: 5 }).map((_, i) => (
-          <span key={i} className={`h-2 w-2 rounded-full ${i < filled ? dotColor(t.confidence, t.is_anti_pattern) : "bg-neutral-200"}`} />
+          <span
+            key={i}
+            className={`h-2 w-2 rounded-full ${i < filled ? dotColor(t.confidence, t.is_anti_pattern) : "bg-neutral-200"}`}
+          />
         ))}
-        <span className="ml-2 text-sm tabular-nums text-neutral-600">{t.confidence.toFixed(2)}</span>
-        <span className="ml-3 text-xs text-neutral-500">{t.successes} for {t.total_uses}</span>
+        <span className="ml-2 text-sm tabular-nums text-neutral-600">
+          {t.confidence.toFixed(2)}
+        </span>
+        <span className="ml-3 text-xs text-neutral-500">
+          {t.successes} for {t.total_uses}
+        </span>
       </div>
       <p className="mt-3 text-sm text-neutral-700">{t.evidence}</p>
       <p className="mt-2 text-xs italic text-neutral-500">{t.timing}</p>
@@ -1843,7 +1969,15 @@ export function TacticCard({ tactic: t, flash }: { tactic: Tactic; flash: "up" |
 "use client";
 import type { Playbook as PB, PlaybookBranch } from "@/lib/types";
 
-function Branch({ b, flashRefs, depth = 0 }: { b: PlaybookBranch; flashRefs: Set<string>; depth?: number }) {
+function Branch({
+  b,
+  flashRefs,
+  depth = 0,
+}: {
+  b: PlaybookBranch;
+  flashRefs: Set<string>;
+  depth?: number;
+}) {
   const flash = flashRefs.has(b.tactic_ref);
   // Inline style for depth indent — Tailwind JIT can't parse `ml-${n}` template strings.
   return (
@@ -1851,25 +1985,43 @@ function Branch({ b, flashRefs, depth = 0 }: { b: PlaybookBranch; flashRefs: Set
       style={{ marginLeft: `${depth * 16}px` }}
       className={`border-l-2 pl-4 py-2 transition-colors duration-700 ${flash ? "border-emerald-500 bg-emerald-50" : "border-neutral-200"}`}
     >
-      <div className="text-xs uppercase tracking-wide text-neutral-500">{b.condition}</div>
+      <div className="text-xs uppercase tracking-wide text-neutral-500">
+        {b.condition}
+      </div>
       <div className="mt-1 font-medium">{b.move}</div>
       <div className="text-sm text-neutral-600">{b.rationale}</div>
-      {b.followup?.map((f, i) => <Branch key={i} b={f} flashRefs={flashRefs} depth={depth + 1} />)}
+      {b.followup?.map((f, i) => (
+        <Branch key={i} b={f} flashRefs={flashRefs} depth={depth + 1} />
+      ))}
     </div>
   );
 }
 
-export function Playbook({ playbook, flashRefs }: { playbook: PB; flashRefs: Set<string> }) {
+export function Playbook({
+  playbook,
+  flashRefs,
+}: {
+  playbook: PB;
+  flashRefs: Set<string>;
+}) {
   return (
     <section className="rounded-xl border border-neutral-200 bg-white p-6">
       <h3 className="mb-4 font-semibold">Playbook</h3>
-      <div className={`rounded-lg p-3 transition-colors duration-700 ${flashRefs.has(playbook.opening.tactic_ref) ? "bg-emerald-50" : "bg-neutral-50"}`}>
-        <div className="text-xs uppercase tracking-wide text-neutral-500">Opening</div>
+      <div
+        className={`rounded-lg p-3 transition-colors duration-700 ${flashRefs.has(playbook.opening.tactic_ref) ? "bg-emerald-50" : "bg-neutral-50"}`}
+      >
+        <div className="text-xs uppercase tracking-wide text-neutral-500">
+          Opening
+        </div>
         <div className="font-medium">{playbook.opening.move}</div>
-        <div className="text-sm text-neutral-600">{playbook.opening.rationale}</div>
+        <div className="text-sm text-neutral-600">
+          {playbook.opening.rationale}
+        </div>
       </div>
       <div className="mt-4 space-y-2">
-        {playbook.branches.map((b, i) => <Branch key={i} b={b} flashRefs={flashRefs} />)}
+        {playbook.branches.map((b, i) => (
+          <Branch key={i} b={b} flashRefs={flashRefs} />
+        ))}
       </div>
     </section>
   );
@@ -1885,7 +2037,8 @@ import type { Tactic } from "@/lib/types";
 export function AntiPatternSparkline({ tactic }: { tactic: Tactic }) {
   const pts = tactic.history ?? [];
   if (pts.length < 2) return null;
-  const w = 320, h = 60;
+  const w = 320,
+    h = 60;
   const max = Math.max(...pts.map((p) => p.confidence));
   const min = Math.min(...pts.map((p) => p.confidence));
   const range = Math.max(0.01, max - min);
@@ -1902,7 +2055,9 @@ export function AntiPatternSparkline({ tactic }: { tactic: Tactic }) {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold text-white">AVOID</span>
+            <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+              AVOID
+            </span>
             <h3 className="font-semibold">{tactic.name}</h3>
           </div>
           <p className="mt-1 text-sm text-neutral-700">{tactic.evidence}</p>
@@ -1927,7 +2082,11 @@ export function AntiPatternSparkline({ tactic }: { tactic: Tactic }) {
 "use client";
 import type { Briefing } from "@/lib/types";
 
-export function SignalFeed({ signals }: { signals: Briefing["recent_signals"] }) {
+export function SignalFeed({
+  signals,
+}: {
+  signals: Briefing["recent_signals"];
+}) {
   if (!signals.length) return null;
   return (
     <section className="rounded-xl border border-neutral-200 bg-white p-6">
@@ -1939,7 +2098,9 @@ export function SignalFeed({ signals }: { signals: Briefing["recent_signals"] })
               {s.date} · {s.source}
             </div>
             <div className="font-medium">{s.summary}</div>
-            <div className="text-sm italic text-neutral-600">{s.interpretation}</div>
+            <div className="text-sm italic text-neutral-600">
+              {s.interpretation}
+            </div>
           </li>
         ))}
       </ul>
@@ -1977,6 +2138,7 @@ git add frontend/src/components && git commit -m "feat(frontend): TacticCard + P
 ### Task F8: PostCallForm + ScoreDiff panel
 
 **Files:**
+
 - Create: `frontend/src/components/PostCallForm.tsx`
 - Create: `frontend/src/components/ScoreDiff.tsx`
 
@@ -1986,7 +2148,12 @@ git add frontend/src/components && git commit -m "feat(frontend): TacticCard + P
 "use client";
 import { useState } from "react";
 
-const OUTCOMES = ["Successful concession", "No movement", "Escalated", "Rescheduled"] as const;
+const OUTCOMES = [
+  "Successful concession",
+  "No movement",
+  "Escalated",
+  "Rescheduled",
+] as const;
 
 export function PostCallForm({
   onClose,
@@ -1996,7 +2163,9 @@ export function PostCallForm({
   onSubmit: (notes: string, outcome: string) => Promise<void>;
 }) {
   const [notes, setNotes] = useState("");
-  const [outcome, setOutcome] = useState<(typeof OUTCOMES)[number]>("Successful concession");
+  const [outcome, setOutcome] = useState<(typeof OUTCOMES)[number]>(
+    "Successful concession",
+  );
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -2011,7 +2180,10 @@ export function PostCallForm({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={onClose}
+    >
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
@@ -2022,10 +2194,16 @@ export function PostCallForm({
           <span className="mb-1 block text-sm font-medium">Outcome</span>
           <select
             value={outcome}
-            onChange={(e) => setOutcome(e.target.value as (typeof OUTCOMES)[number])}
+            onChange={(e) =>
+              setOutcome(e.target.value as (typeof OUTCOMES)[number])
+            }
             className="w-full rounded-lg border border-neutral-300 px-3 py-2"
           >
-            {OUTCOMES.map((o) => <option key={o} value={o}>{o}</option>)}
+            {OUTCOMES.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
           </select>
         </label>
         <label className="mb-4 block">
@@ -2037,10 +2215,18 @@ export function PostCallForm({
             placeholder="What happened on the call? Who said what?"
             className="w-full rounded-lg border border-neutral-300 px-3 py-2"
           />
-          <span className="text-xs text-neutral-500">{notes.length}/20 min chars</span>
+          <span className="text-xs text-neutral-500">
+            {notes.length}/20 min chars
+          </span>
         </label>
         <div className="flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 hover:bg-neutral-100">Cancel</button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-4 py-2 hover:bg-neutral-100"
+          >
+            Cancel
+          </button>
           <button
             type="submit"
             disabled={notes.length < 20 || loading}
@@ -2062,7 +2248,13 @@ export function PostCallForm({
 import { useEffect } from "react";
 import type { ScoreDiff } from "@/lib/types";
 
-export function ScoreDiff({ diffs, onDismiss }: { diffs: Record<string, ScoreDiff>; onDismiss: () => void }) {
+export function ScoreDiff({
+  diffs,
+  onDismiss,
+}: {
+  diffs: Record<string, ScoreDiff>;
+  onDismiss: () => void;
+}) {
   useEffect(() => {
     const t = setTimeout(onDismiss, 4000);
     return () => clearTimeout(t);
@@ -2075,8 +2267,11 @@ export function ScoreDiff({ diffs, onDismiss }: { diffs: Record<string, ScoreDif
         {Object.entries(diffs).map(([name, d]) => (
           <li key={name} className="flex items-center justify-between text-sm">
             <span className="font-medium">{name}</span>
-            <span className={`tabular-nums ${d.direction === "up" ? "text-emerald-600" : "text-red-600"}`}>
-              {d.old.toFixed(2)} → {d.new.toFixed(2)} {d.direction === "up" ? "▲" : "▼"}
+            <span
+              className={`tabular-nums ${d.direction === "up" ? "text-emerald-600" : "text-red-600"}`}
+            >
+              {d.old.toFixed(2)} → {d.new.toFixed(2)}{" "}
+              {d.direction === "up" ? "▲" : "▼"}
             </span>
           </li>
         ))}
@@ -2107,6 +2302,7 @@ git add frontend/src/components/PostCallForm.tsx frontend/src/components/ScoreDi
 ### Task D1: Production deploy + backup video
 
 **Files:**
+
 - Modify: `README.md`
 
 - [ ] **Step 1: Push and verify Vercel auto-deploy:**
@@ -2136,20 +2332,23 @@ Expected: both 200.
 
 - [ ] **Step 5: Write `README.md`:**
 
-```markdown
+````markdown
 # LEVERAGE
 
 Vendor Negotiation Intelligence Agent.
 Memory is the product — powered by Hindsight Cloud, orchestrated by the OpenAI Agents SDK.
 
 ## Demo
+
 - Live: https://<vercel-url>
 - Backup video: https://github.com/<you>/leverage/releases/tag/v1.0.0-hackathon
 
 ## The Priya Story
+
 Priya runs procurement at a 400-person SaaS. She renews 47 vendors a year. Every call, she walked in blind — until LEVERAGE. One $380k NexaCloud call, $23,400 saved, $1.1M/year across her portfolio. Procurement is the wedge; sales, legal, M&A, hiring are next.
 
 ## Stack
+
 - Frontend: Next.js 15 (App Router) + TypeScript + Tailwind v3.4 on Vercel
 - Backend: FastAPI + Python 3.11 on Railway
 - Memory: Hindsight Cloud
@@ -2157,6 +2356,7 @@ Priya runs procurement at a 400-person SaaS. She renews 47 vendors a year. Every
 - LLM: OpenAI gpt-4o
 
 ## Run locally
+
 ```bash
 # Backend
 cd backend && python3.11 -m venv .venv && source .venv/bin/activate
@@ -2166,26 +2366,31 @@ uvicorn main:app --reload --port 8000
 
 # Frontend
 cd frontend && npm install
-echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+echo "NEXT_PUBLIC_API_URL=https://set-daring-tadpole.ngrok-free.app" > .env.local
 npm run dev
 ```
+````
 
 ## Seed Hindsight banks
+
 Run at least 6 hours before demo.
+
 ```bash
 cd seeder && python seed_vendors.py
 ```
 
 ## Demo script
+
 See `spec.md §9` for the 6-beat, 5-minute demo script.
-```
+
+````
 
 - [ ] **Step 6: Commit:**
 
 ```bash
 git add README.md && git commit -m "docs: README with Priya story, stack, and run instructions"
 git push
-```
+````
 
 ---
 
