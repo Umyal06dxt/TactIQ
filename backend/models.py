@@ -70,8 +70,33 @@ class Vendor(BaseModel):
     renewal_date: str
     days_remaining: int
     contact: str
+    contact_email: str = ""
+    industry: str = ""
+    risk_level: str = "medium"
     interaction_count: int
     tactic_count: int
+
+
+class VendorCreateRequest(BaseModel):
+    name: str
+    annual_value: int
+    renewal_date: str
+    contact: str
+    contact_email: str = ""
+    notes: str = ""
+    industry: str = ""
+    risk_level: str = "medium"
+
+
+class VendorUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    annual_value: Optional[int] = None
+    renewal_date: Optional[str] = None
+    contact: Optional[str] = None
+    contact_email: Optional[str] = None
+    notes: Optional[str] = None
+    industry: Optional[str] = None
+    risk_level: Optional[str] = None
 
 class VendorListResponse(BaseModel):
     vendors: List[Vendor]
@@ -156,6 +181,7 @@ class SaveCallRequest(BaseModel):
     coaching_shown: List[dict]
     outcome: Optional[Literal["won", "lost", "pending", "escalated"]] = None
     briefing_context: str = ""
+    concessions_made: int = 0
 
 
 class CallRecord(BaseModel):
@@ -171,6 +197,10 @@ class CallRecord(BaseModel):
     adherence_score: Optional[float] = None
     tactics_used: Optional[List[str]] = None
     key_moments: Optional[List[dict]] = None
+    deal_score: Optional[int] = None
+    win_probability: Optional[float] = None
+    concessions_made: Optional[int] = None
+    savings_achieved: Optional[int] = None
     created_at: Optional[str] = None
 
 

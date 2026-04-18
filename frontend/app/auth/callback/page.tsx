@@ -11,7 +11,7 @@ export default function AuthCallback() {
     const token = params.get("token");
     if (token) {
       setToken(token);
-      refresh().then(() => { window.location.href = "/"; });
+      refresh().then(() => { window.location.href = "/dashboard"; });
     } else {
       window.location.href = "/login";
     }

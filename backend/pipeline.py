@@ -117,25 +117,39 @@ async def run_briefing(bank_id: str, vendor_meta: dict) -> tuple[dict, List[Pipe
         f"Follow your instructions exactly: recall -> synthesize -> rank. "
         f"Return the complete briefing JSON as your final answer."
     )
-    result = await Runner.run(BRIEFING_AGENT, input=user_input, hooks=hooks)
+    result = await Runner.run(BRIEFING_AGENT, input=user_input, hooks=hooks, max_turns=10)
 
-    output_str = result.final_output
-    if not output_str:
-        # Agent ended after tool calls without a text response — extract synthesize_briefing output
-        for item in reversed(result.new_items):
+    # Try final_output first
+    raw: dict | None = None
+    if result.final_output:
+        try:
+            candidate = _parse_json(result.final_output, bank_id)
+            if "briefing" in candidate and "tactics" not in candidate:
+                candidate = candidate["briefing"]
+            if "tactics" in candidate:
+                raw = candidate
+        except Exception:
+            pass
+
+    # Fallback: scan all tool outputs for one that contains a "tactics" key
+    # (synthesize_briefing output has it; recall_memories output does not)
+    if raw is None:
+        for item in result.new_items:
             if isinstance(item, ToolCallOutputItem):
-                candidate = item.output
-                if isinstance(candidate, str) and candidate.strip().startswith("{"):
-                    output_str = candidate
-                    break
+                output = item.output
+                if not isinstance(output, str) or not output.strip().startswith("{"):
+                    continue
+                try:
+                    parsed = json.loads(output)
+                    if "tactics" in parsed:
+                        raw = parsed
+                        # keep scanning — prefer the rank_tactics output if it appears later
+                except Exception:
+                    pass
 
-    if not output_str:
-        raise RuntimeError(f"BriefingAgent returned no output for {bank_id}")
+    if raw is None:
+        raise RuntimeError(f"BriefingAgent returned no usable briefing for {bank_id}")
 
-    raw = _parse_json(output_str, bank_id)
-    # Agent sometimes wraps output: {"briefing": {...}} — unwrap if needed
-    if "briefing" in raw and "tactics" not in raw:
-        raw = raw["briefing"]
     return raw, hooks.steps
 
 
@@ -213,7 +227,7 @@ def _norm_playbook(pb) -> dict:
 
 
 def _norm_signals(items: list, kind: str) -> list:
-    """Coerce string signals into proper dicts."""
+    """Coerce string signals into proper dicts and fill missing required fields."""
     out = []
     for item in items:
         if isinstance(item, str):
@@ -221,6 +235,19 @@ def _norm_signals(items: list, kind: str) -> list:
                 out.append({"label": item, "severity": "medium"})
             else:
                 out.append({"date": "", "source": "unknown", "summary": item, "interpretation": ""})
+        elif isinstance(item, dict):
+            if kind == "temporal":
+                out.append({
+                    "label": item.get("label") or item.get("signal") or "Signal",
+                    "severity": item.get("severity", "medium"),
+                })
+            else:
+                out.append({
+                    "date": item.get("date", ""),
+                    "source": item.get("source", "unknown"),
+                    "summary": item.get("summary", ""),
+                    "interpretation": item.get("interpretation", ""),
+                })
         else:
             out.append(item)
     return out

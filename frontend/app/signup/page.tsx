@@ -18,7 +18,7 @@ export default function SignupPage() {
     try {
       await signup(email, password, fullName);
       await refresh();
-      window.location.href = "/";
+      window.location.href = "/dashboard";
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Signup failed");
     } finally {
@@ -30,7 +30,7 @@ export default function SignupPage() {
     <div className="min-h-screen bg-[#05080f] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-10 text-center">
-          <h1 className="text-3xl font-black text-white tracking-tight">LEVERAGE</h1>
+          <h1 className="text-3xl font-black text-white tracking-tight">TACTIQ</h1>
           <p className="text-white/30 text-sm mt-2">Create your account</p>
         </div>
         <form onSubmit={submit} className="space-y-4">

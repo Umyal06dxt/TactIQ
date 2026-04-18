@@ -13,8 +13,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#05080f] flex items-center justify-center px-4">
       <div className="w-full max-w-sm text-center">
         <div className="mb-10">
-          <h1 className="text-3xl font-black text-white tracking-tight">LEVERAGE</h1>
-          <p className="text-white/30 text-sm mt-2">Negotiation intelligence platform</p>
+          <h1 className="text-3xl font-black text-white tracking-tight">TACTIQ</h1>
+          <p className="text-white/30 text-sm mt-2">AI-powered negotiation intelligence</p>
         </div>
         <button
           onClick={signInWithGoogle}

@@ -5,26 +5,9 @@ import json
 import os
 
 from models import Briefing
+from prompts import CALL_COACH_SYSTEM
 
 openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
-
-COACH_SYSTEM = """You are a real-time negotiation coach embedded in a live vendor contract call. You see the briefing, the full transcript so far, and the latest thing the buyer said.
-
-Return ONLY this JSON — no prose, no fences:
-{
-  "suggestions": ["<verbatim phrase to say now>", "<alternative>", "<third option>"],
-  "warnings": ["<one concrete pitfall>"],
-  "correction": "<only if they just made a strategic error — else null>",
-  "current_tactic": "<exact tactic name from briefing in play right now, else null>"
-}
-
-STRICT RULES:
-- suggestions: 3 verbatim phrases, ready to say out loud, varied in tone (assertive / collaborative / deflecting). Never generic. Use the vendor's name, contract value, renewal date when relevant.
-- warnings: exactly 1 specific pitfall based on the vendor's known patterns from the briefing. No generic advice.
-- correction: non-null ONLY if they: revealed their budget ceiling, made an unearned concession, contradicted the playbook, or used a known anti-pattern. Be blunt. Otherwise null.
-- current_tactic: name the exact briefing tactic being played right now. null if none clearly applies.
-- Be a coach who has studied this specific vendor for years. Every output should feel like it could only apply to this call.
-"""
 
 
 def _build_context(briefing: Briefing) -> str:
@@ -59,6 +42,8 @@ PLAYBOOK:
 async def run_call_coach(websocket: WebSocket, briefing: Briefing) -> None:
     context = _build_context(briefing)
     transcript_lines: list[str] = []
+    concession_count = 0
+    win_prob = 50
 
     try:
         while True:
@@ -76,7 +61,6 @@ async def run_call_coach(websocket: WebSocket, briefing: Briefing) -> None:
                 continue
 
             transcript_lines.append(text)
-            # Keep last 20 turns to avoid bloating context
             recent = "\n".join(f"  [{i+1}] {t}" for i, t in enumerate(transcript_lines[-20:]))
 
             user_content = f"""{context}
@@ -86,22 +70,43 @@ TRANSCRIPT (what the procurement manager has said so far):
 
 Latest turn: "{text}"
 
+Current win probability estimate: {win_prob}%
+Concessions made so far: {concession_count}
+
 Coach them now. Return JSON only."""
 
             try:
                 resp = await openai_client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
-                        {"role": "system", "content": COACH_SYSTEM},
+                        {"role": "system", "content": CALL_COACH_SYSTEM},
                         {"role": "user", "content": user_content},
                     ],
                     response_format={"type": "json_object"},
-                    max_tokens=500,
+                    max_tokens=600,
                     temperature=0.4,
                 )
                 content = resp.choices[0].message.content or "{}"
                 coaching = json.loads(content)
-                await websocket.send_json({"type": "coach", **coaching})
+
+                # Update running state
+                if coaching.get("win_probability") is not None:
+                    win_prob = int(coaching["win_probability"])
+                if coaching.get("concession_alert"):
+                    concession_count += 1
+
+                await websocket.send_json({
+                    "type": "coach",
+                    "suggestions": coaching.get("suggestions", []),
+                    "warnings": coaching.get("warnings", []),
+                    "correction": coaching.get("correction"),
+                    "current_tactic": coaching.get("current_tactic"),
+                    "win_probability": win_prob,
+                    "concession_alert": coaching.get("concession_alert"),
+                    "deal_momentum": coaching.get("deal_momentum", "neutral"),
+                    "coach_note": coaching.get("coach_note"),
+                    "concession_count": concession_count,
+                })
             except Exception as e:
                 try:
                     if websocket.client_state == WebSocketState.CONNECTED:

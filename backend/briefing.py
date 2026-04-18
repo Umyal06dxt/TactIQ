@@ -49,8 +49,10 @@ async def cached_briefing(bank_id: str, vendor_meta: dict) -> Briefing:
                 if isinstance(data, str):
                     data = json.loads(data)
                 briefing = Briefing(**data)
-                _cache[bank_id] = (briefing, time.monotonic())
-                return briefing
+                # Reject empty/corrupt cached briefings — they'll be regenerated
+                if briefing.tactics:
+                    _cache[bank_id] = (briefing, time.monotonic())
+                    return briefing
 
     # 3. Generate fresh
     briefing = await build_briefing(bank_id, vendor_meta)

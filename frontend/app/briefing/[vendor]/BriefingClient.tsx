@@ -92,7 +92,7 @@ export function BriefingClient({ vendor, initial }: { vendor: string; initial: B
       <header className="mb-8 border-b border-neutral-200 pb-6 flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <a href="/" className="text-sm text-neutral-400 hover:text-neutral-600">← Dashboard</a>
+            <a href="/dashboard" className="text-sm text-neutral-400 hover:text-neutral-600">← Dashboard</a>
           </div>
           <h1 className="text-3xl font-bold text-gray-900">{vendor.toUpperCase()}</h1>
           <p className="mt-1 text-sm text-neutral-500">
